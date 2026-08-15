@@ -1,11 +1,12 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.afiliaciones import cambiar_afiliacion, obtener_ips_activa
-from app.core.deps import oauth2_scheme
+from app.core.deps import security_scheme
 from app.core.otp import generar_codigo, validar_codigo
 from app.core.rate_limit import limiter
 from app.core.security import (
@@ -179,10 +180,14 @@ def confirmar_cambio_password(request: Request, payload: ConfirmarCambioPassword
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+def logout(
+    credenciales: HTTPAuthorizationCredentials = Depends(security_scheme),
+    db: Session = Depends(get_db),
+):
     """Revoca el token actual: no invalida otras sesiones del mismo usuario, solo
     este token puntual (identificado por su 'jti'). Idempotente — si el token ya
     es inválido o ya estaba revocado, igual responde 204."""
+    token = credenciales.credentials
     payload = decode_access_token(token)
     if payload is None:
         return
@@ -199,3 +204,4 @@ def logout(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     if db.get(TokenRevocado, jti) is None:
         db.add(TokenRevocado(jti=jti, expira_en=datetime.fromtimestamp(exp, tz=timezone.utc)))
     db.commit()
+    
