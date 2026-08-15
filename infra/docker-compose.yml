@@ -1,0 +1,108 @@
+version: "3.9"
+
+# Arquitectura de interoperabilidad: 1 base de datos central + 3 bases de
+# datos independientes (una por IPS simulada). El backend es el único
+# servicio que se conecta a las 4 — cada IPS no sabe que las demás existen,
+# igual que en la vida real.
+
+services:
+  db_central:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: medicerca
+      POSTGRES_PASSWORD: medicerca
+      POSTGRES_DB: medicerca
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_central_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medicerca"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  db_ips1:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: medicerca
+      POSTGRES_PASSWORD: medicerca
+      POSTGRES_DB: ips1
+    ports:
+      - "5433:5432"
+    volumes:
+      - db_ips1_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medicerca -d ips1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  db_ips2:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: medicerca
+      POSTGRES_PASSWORD: medicerca
+      POSTGRES_DB: ips2
+    ports:
+      - "5434:5432"
+    volumes:
+      - db_ips2_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medicerca -d ips2"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  db_ips3:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: medicerca
+      POSTGRES_PASSWORD: medicerca
+      POSTGRES_DB: ips3
+    ports:
+      - "5435:5432"
+    volumes:
+      - db_ips3_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medicerca -d ips3"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ../backend/.env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://medicerca:medicerca@db_central:5432/medicerca
+      DATABASE_URL_IPS_1: postgresql+psycopg2://medicerca:medicerca@db_ips1:5432/ips1
+      DATABASE_URL_IPS_2: postgresql+psycopg2://medicerca:medicerca@db_ips2:5432/ips2
+      DATABASE_URL_IPS_3: postgresql+psycopg2://medicerca:medicerca@db_ips3:5432/ips3
+      AUTO_CREATE_SCHEMA: "true"
+    depends_on:
+      db_central:
+        condition: service_healthy
+      db_ips1:
+        condition: service_healthy
+      db_ips2:
+        condition: service_healthy
+      db_ips3:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend/app:/app/app
+
+volumes:
+  db_central_data:
+  db_ips1_data:
+  db_ips2_data:
+  db_ips3_data:
