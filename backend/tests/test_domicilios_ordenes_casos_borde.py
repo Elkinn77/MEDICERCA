@@ -259,3 +259,60 @@ def test_actualizar_estado_domicilio_requiere_rol_regente(
     assert actualizado.status_code == 200
     assert actualizado.json()["estado"] == "en_camino"
     assert actualizado.json()["lat_actual"] == 4.65
+
+
+# ---------------------------------------------------------------------------
+# Historial de estados: control de acceso
+# ---------------------------------------------------------------------------
+
+def test_paciente_no_puede_ver_historial_de_domicilio_ajeno(
+    client: TestClient, db_session, ips_db, token_factory
+) -> None:
+    """Mismo control de acceso que GET /{ips_id}/{domicilio_id}: un paciente
+    solo puede ver el historial de SUS PROPIOS domicilios, no los de otro
+    paciente de la misma IPS."""
+    medicamento_id = _crear_medicamento(db_session, rx=False, sufijo="HIST1")
+    orden_id = _crear_orden(ips_db, estado=EstadoOrden.APROBADA, medicamento_id=medicamento_id, cedula="2020202020")
+    punto_id = _crear_punto_venta(ips_db)
+    dueño = token_factory(cedula="2020202020", ips_id=1)
+    otro_paciente = token_factory(cedula="3030303030", ips_id=1)
+
+    creado = client.post(
+        "/api/v1/domicilios",
+        json={"ips_id": 1, "orden_id": orden_id, "punto_origen_id": punto_id, "medicamento_id": medicamento_id},
+        headers=dueño,
+    )
+    domicilio_id = creado.json()["id"]
+
+    intento_ajeno = client.get(f"/api/v1/domicilios/1/{domicilio_id}/historial", headers=otro_paciente)
+    assert intento_ajeno.status_code == 403
+
+    propio = client.get(f"/api/v1/domicilios/1/{domicilio_id}/historial", headers=dueño)
+    assert propio.status_code == 200
+    assert len(propio.json()) == 1
+    assert propio.json()[0]["estado"] == "confirmado"
+
+
+def test_regente_no_puede_ver_historial_de_domicilio_de_otro_paciente(
+    client: TestClient, db_session, ips_db, token_factory
+) -> None:
+    """Mismo comportamiento que GET /{ips_id}/{domicilio_id} (su endpoint
+    hermano): esta app restringe la lectura de un domicilio al paciente dueño,
+    sin excepcion para el rol regente. El regente SI puede escribir (PATCH del
+    estado, ver test_solo_regente_puede_actualizar_estado_de_domicilio), pero
+    no leer el domicilio o historial de un paciente que no es el suyo."""
+    medicamento_id = _crear_medicamento(db_session, rx=False, sufijo="HIST2")
+    orden_id = _crear_orden(ips_db, estado=EstadoOrden.APROBADA, medicamento_id=medicamento_id, cedula="4040404040")
+    punto_id = _crear_punto_venta(ips_db)
+    paciente = token_factory(cedula="4040404040", ips_id=1)
+    regente = token_factory(rol=RolUsuario.REGENTE, ips_id=1)
+
+    creado = client.post(
+        "/api/v1/domicilios",
+        json={"ips_id": 1, "orden_id": orden_id, "punto_origen_id": punto_id, "medicamento_id": medicamento_id},
+        headers=paciente,
+    )
+    domicilio_id = creado.json()["id"]
+
+    respuesta = client.get(f"/api/v1/domicilios/1/{domicilio_id}/historial", headers=regente)
+    assert respuesta.status_code == 403

@@ -254,6 +254,58 @@ bandit -r app
 pip-audit -r requirements.txt --ignore-vuln PYSEC-2026-1325
 ```
 
+### Sesión 6 — historial de estados de domicilio + motor de disponibilidad desacoplado
+
+**Implementado:**
+- Nueva tabla `historial_estado_domicilio` (una fila por cada cambio de
+  estado del domicilio, con timestamp, en vez de sobrescribir el estado
+  actual). Se crea sola en las 3 bases de IPS gracias a
+  `AUTO_CREATE_SCHEMA=true`, no requirió migración manual de Alembic.
+- Nuevo endpoint `GET /api/v1/domicilios/{ips_id}/{domicilio_id}/historial`.
+  **Regla de acceso importante**: reutiliza el mismo control que
+  `GET /{ips_id}/{domicilio_id}` — solo el paciente dueño del pedido puede
+  verlo, **sin excepción de rol**. Ni siquiera el regente que actualiza la
+  logística tiene acceso a este endpoint. Confirmado manualmente: con token
+  de regente da 403 "No tienes acceso a este domicilio"; con token del
+  paciente dueño, 200 con el arreglo completo.
+- Motor de disponibilidad desacoplado detrás de una interfaz
+  `CalculadorDistancia`, para poder integrar Google Maps más adelante sin
+  reescribir la lógica de negocio (queda para la tesis, no ahora).
+- **51/51 tests pasan.**
+
+**Verificado manualmente end-to-end vía Swagger + Docker real** (5
+contenedores healthy, `docker compose up --build`), flujo completo:
+registro → verificación OTP → login → creación de orden (RX, Losartán) →
+intento de aprobación con rol paciente (403 esperado, confirma protección de
+rol) → cambio de rol a REGENTE directo en la base (no hay endpoint público
+para esto, por diseño) → aprobación de la orden → consulta de disponibilidad
+→ creación de domicilio → actualización de estado (regente) → consulta de
+historial (paciente) con dos filas acumuladas.
+
+**Hallazgos / cuidados para la próxima sesión:**
+- El paciente queda atado a su `ips_id` de afiliación desde el registro y
+  **no puede operar en otra IPS** aunque haya stock ahí — `POST /ordenes`
+  devuelve 403 "La operacion solo esta permitida en la IPS vigente del
+  usuario" si el `ips_id` del payload no coincide. Confirmar que esto está
+  cubierto por un test explícito; si no, agregarlo.
+- El enum `rolusuario` en Postgres usa valores en **mayúsculas**
+  (`PACIENTE`, `REGENTE`), aunque la API los serializa en minúscula
+  (`"rol": "paciente"`) — si se toca ese enum a mano (SQL directo), usar
+  mayúsculas o falla el `UPDATE`.
+- Los datos demo de `inventario` pueden traer `cantidad = 0` en algunos
+  puntos de venta — el endpoint de `disponibilidad` los filtra
+  correctamente (no los muestra), es el comportamiento esperado, no un bug.
+- No hay endpoints para listar EPS desde la API (solo se usa como tabla de
+  referencia con FK) — si se necesita en el futuro, falta exponerlo.
+- `PATCH /domicilios/{ips_id}/{domicilio_id}/estado` requiere rol regente
+  (staff de la IPS); el paciente solo puede leer su tracking, no
+  actualizarlo. Ya estaba documentado en la descripción del endpoint,
+  confirmado en la prueba.
+
+**Pendiente:** `git push` de estos cambios (aún no hecho al cierre de esta
+sesión) y confirmar que el CI (`tests` + `seguridad`) pasa en verde contra
+GitHub Actions real.
+
 ## Instrucción para la próxima IA
 Antes de asumir que algo falta, **lee el código real**, no te bases solo en
 este resumen. Este archivo puede quedar desactualizado a medida que se

@@ -1,5 +1,6 @@
 """Interoperability gateway: aggregate availability from registered IPS systems."""
 import math
+from abc import ABC, abstractmethod
 
 from sqlalchemy.orm import Session
 
@@ -9,12 +10,42 @@ from app.models_ips import Inventario, PuntoVenta
 from app.schemas.disponibilidad import ResultadoDisponibilidad
 
 
-def _distancia_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
-    radio = 6371.0
-    dlat = math.radians(lat2 - lat1)
-    dlng = math.radians(lng2 - lng1)
-    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng / 2) ** 2
-    return radio * 2 * math.asin(math.sqrt(a))
+class CalculadorDistancia(ABC):
+    """Contrato para calcular la distancia entre el usuario y un punto de venta.
+
+    Hoy solo existe `DistanciaLineaRecta` (fórmula de Haversine, sin llamadas
+    externas). El día que se integre una API real de mapas (ej. Google Maps
+    Distance Matrix, para distancia/tiempo por calles en vez de línea recta),
+    esa integración se escribe como OTRA clase que cumpla este mismo contrato
+    — se cambia una línea en `buscar_disponibilidad` (qué calculador usar) y
+    el resto del motor no se toca."""
+
+    @abstractmethod
+    def distancia_km(self, lat_usuario: float, lng_usuario: float, lat_punto: float, lng_punto: float) -> float:
+        raise NotImplementedError
+
+
+class DistanciaLineaRecta(CalculadorDistancia):
+    """Distancia geográfica en línea recta (fórmula de Haversine). No conoce
+    calles, tráfico ni rutas reales — es una aproximación intencional para la
+    entrega actual, suficiente para ordenar puntos por cercanía relativa."""
+
+    RADIO_TIERRA_KM = 6371.0
+
+    def distancia_km(self, lat_usuario: float, lng_usuario: float, lat_punto: float, lng_punto: float) -> float:
+        dlat = math.radians(lat_punto - lat_usuario)
+        dlng = math.radians(lng_punto - lng_usuario)
+        a = (
+            math.sin(dlat / 2) ** 2
+            + math.cos(math.radians(lat_usuario)) * math.cos(math.radians(lat_punto)) * math.sin(dlng / 2) ** 2
+        )
+        return self.RADIO_TIERRA_KM * 2 * math.asin(math.sqrt(a))
+
+
+# Calculador usado por defecto en toda la app. Cambiar esta única línea (por
+# una instancia de un futuro `DistanciaGoogleMaps`, por ejemplo) es todo lo
+# que haría falta para pasar a distancia/tiempo real por calles.
+calculador_distancia_por_defecto: CalculadorDistancia = DistanciaLineaRecta()
 
 
 def _consultar_una_ips(ips: InstitucionPrestadora, medicamento_id: int) -> list[tuple[Inventario, PuntoVenta]]:
@@ -32,7 +63,12 @@ def _consultar_una_ips(ips: InstitucionPrestadora, medicamento_id: int) -> list[
 
 
 def buscar_disponibilidad(
-    db_central: Session, medicamento_id: int, lat_usuario: float, lng_usuario: float, ciudad_usuario: str
+    db_central: Session,
+    medicamento_id: int,
+    lat_usuario: float,
+    lng_usuario: float,
+    ciudad_usuario: str,
+    calculador: CalculadorDistancia = calculador_distancia_por_defecto,
 ) -> list[ResultadoDisponibilidad]:
     ips_activas = db_central.query(InstitucionPrestadora).filter(InstitucionPrestadora.activa.is_(True)).all()
     todas: list[tuple[InstitucionPrestadora, Inventario, PuntoVenta]] = []
@@ -46,7 +82,9 @@ def buscar_disponibilidad(
     if con_stock:
         misma_ciudad = [fila for fila in con_stock if fila[2].ciudad.lower() == ciudad_usuario.lower()]
         otra_ciudad = [fila for fila in con_stock if fila[2].ciudad.lower() != ciudad_usuario.lower()]
-        misma_ciudad.sort(key=lambda fila: _distancia_km(lat_usuario, lng_usuario, float(fila[2].lat), float(fila[2].lng)))
+        misma_ciudad.sort(
+            key=lambda fila: calculador.distancia_km(lat_usuario, lng_usuario, float(fila[2].lat), float(fila[2].lng))
+        )
         resultados = [_a_resultado(ips, inv, punto, "punto_mas_cercano" if i == 0 else "otro_punto_ciudad") for i, (ips, inv, punto) in enumerate(misma_ciudad)]
         return resultados + [_a_resultado(ips, inv, punto, "otra_ciudad") for ips, inv, punto in otra_ciudad]
 

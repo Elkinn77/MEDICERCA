@@ -116,3 +116,25 @@ class Domicilio(IPSBase):
     lng_actual: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
 
     orden: Mapped["OrdenMedica"] = relationship(back_populates="domicilios")
+    historial: Mapped[list["HistorialEstadoDomicilio"]] = relationship(
+        back_populates="domicilio", order_by="HistorialEstadoDomicilio.registrado_en"
+    )
+
+
+class HistorialEstadoDomicilio(IPSBase):
+    """Registro append-only de cada cambio de estado de un domicilio. Nunca se
+    edita ni se borra una fila existente — solo se agregan nuevas, para tener
+    trazabilidad completa de un pedido ('confirmado a las 10:00, en camino a
+    las 10:15, entregado a las 10:40'). Hoy el estado lo cambia un regente a
+    mano; si en el futuro se automatiza (ej. app de repartidor con GPS), esta
+    tabla ya está lista para recibir esas escrituras sin cambiar su forma."""
+    __tablename__ = "historial_estado_domicilio"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    domicilio_id: Mapped[int] = mapped_column(ForeignKey("domicilio.id"), index=True)
+    estado: Mapped[EstadoDomicilio] = mapped_column(Enum(EstadoDomicilio))
+    lat_actual: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
+    lng_actual: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
+    registrado_en: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    domicilio: Mapped["Domicilio"] = relationship(back_populates="historial")

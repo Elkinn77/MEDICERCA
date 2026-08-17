@@ -8,8 +8,8 @@ from app.database import get_db
 from app.ips_db import ips_session
 from app.models.medicamento import Medicamento
 from app.models.usuario import RolUsuario, Usuario
-from app.models_ips import Domicilio, EstadoOrden, OrdenMedica, PuntoVenta
-from app.schemas.pedido import DomicilioCreate, DomicilioEstadoUpdate, DomicilioOut
+from app.models_ips import Domicilio, EstadoOrden, HistorialEstadoDomicilio, OrdenMedica, PuntoVenta
+from app.schemas.pedido import DomicilioCreate, DomicilioEstadoUpdate, DomicilioOut, HistorialEstadoDomicilioOut
 
 router = APIRouter(prefix="/api/v1/domicilios", tags=["domicilios"])
 
@@ -59,6 +59,11 @@ def crear_domicilio(
             raise HTTPException(status_code=422, detail=str(exc))
         domicilio = Domicilio(orden_id=orden.id, punto_origen_id=payload.punto_origen_id)
         db.add(domicilio)
+        db.flush()
+        # Primer registro del historial: el estado inicial con el que nace todo
+        # domicilio (CONFIRMADO). Así el historial siempre arranca completo,
+        # sin un "hueco" antes del primer cambio manual.
+        db.add(HistorialEstadoDomicilio(domicilio_id=domicilio.id, estado=domicilio.estado))
         db.commit()
         db.refresh(domicilio)
         db.expunge(domicilio)
@@ -74,6 +79,30 @@ def obtener(
 ):
     _, domicilio = _obtener_domicilio_del_usuario(db_central, usuario, ips_id, domicilio_id)
     return domicilio
+
+
+@router.get("/{ips_id}/{domicilio_id}/historial", response_model=list[HistorialEstadoDomicilioOut])
+def obtener_historial(
+    ips_id: int,
+    domicilio_id: int,
+    db_central: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+):
+    """Linea de tiempo completa de un domicilio, en orden cronologico. Mismo
+    control de acceso que GET /{ips_id}/{domicilio_id} (reutiliza el mismo
+    helper): solo el paciente dueño del pedido puede verlo, sin excepcion de
+    rol — igual que su endpoint hermano."""
+    ips, _ = _obtener_domicilio_del_usuario(db_central, usuario, ips_id, domicilio_id)
+    with ips_session(ips) as db:
+        filas = (
+            db.query(HistorialEstadoDomicilio)
+            .filter(HistorialEstadoDomicilio.domicilio_id == domicilio_id)
+            .order_by(HistorialEstadoDomicilio.registrado_en)
+            .all()
+        )
+        for fila in filas:
+            db.expunge(fila)
+        return filas
 
 
 @router.patch("/{ips_id}/{domicilio_id}/estado", response_model=DomicilioOut)
@@ -97,6 +126,17 @@ def actualizar_estado(
             domicilio.lat_actual = payload.lat_actual
         if payload.lng_actual is not None:
             domicilio.lng_actual = payload.lng_actual
+        # Cada cambio de estado queda como una fila nueva, nunca se sobrescribe
+        # ni se borra una anterior — así se puede reconstruir la línea de
+        # tiempo completa del pedido más adelante.
+        db.add(
+            HistorialEstadoDomicilio(
+                domicilio_id=domicilio.id,
+                estado=domicilio.estado,
+                lat_actual=domicilio.lat_actual,
+                lng_actual=domicilio.lng_actual,
+            )
+        )
         db.commit()
         db.refresh(domicilio)
         db.expunge(domicilio)

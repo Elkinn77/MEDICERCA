@@ -50,3 +50,12 @@ class DomicilioEstadoUpdate(BaseModel):
     lat_actual: float | None = Field(default=None, ge=-90, le=90)
     lng_actual: float | None = Field(default=None, ge=-180, le=180)
 
+
+class HistorialEstadoDomicilioOut(BaseModel):
+    estado: EstadoDomicilio
+    lat_actual: float | None
+    lng_actual: float | None
+    registrado_en: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
