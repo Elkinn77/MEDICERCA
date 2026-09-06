@@ -18,33 +18,47 @@ la orden médica que lo ampara.
   `models_ips` (SQLAlchemy) → `schemas` (Pydantic).
 - Auth: JWT (HS256) con `jti` para revocación (logout real), bcrypt, bloqueo
   por fuerza bruta, OTP por correo (simulado, se ve en la respuesta en modo
-  demo) generado con `secrets.randbelow` (CSPRNG).
+  demo) generado con `secrets.randbelow` (CSPRNG). Esquema de seguridad en
+  Swagger es `HTTPBearer` (no `OAuth2PasswordBearer`) — ver Sesión 8 de la
+  versión anterior de este archivo / código real en `app/core/deps.py`.
 - Rate limiting por IP con `slowapi` en los endpoints de auth más sensibles
   (`app/core/rate_limit.py`).
 - Manejador global de errores no controlados (`@app.exception_handler(Exception)`
   en `app/main.py`): nunca se filtra un stack trace al cliente.
 - Migraciones: Alembic separado para central (`alembic/central`) y para IPS
   (`alembic/ips`), porque la BD de IPS se replica igual en 3 instancias.
+  **Importante**: `AUTO_CREATE_SCHEMA=true` (default en `config.py`) hace que
+  el backend cree tablas nuevas solas al arrancar (`create_all`, que no
+  pisa tablas existentes). Esto significa que en desarrollo local casi nunca
+  hace falta correr Alembic a mano — solo importa de verdad el día que se
+  despliegue a un servidor real con `AUTO_CREATE_SCHEMA=false`.
 - Dependencias fijadas con `pip-compile` (pip-tools): `requirements.in` /
   `requirements-dev.in` son la fuente (rangos abiertos), `requirements.txt` /
-  `requirements-dev.txt` son el lockfile generado (versiones exactas). Para
-  regenerar tras cambiar un `.in`: `pip-compile requirements.in -o
-  requirements.txt` (y lo mismo para el `-dev`).
+  `requirements-dev.txt` son el lockfile generado (versiones exactas).
 - CI en GitHub Actions (`.github/workflows/ci.yml`, en la raíz del repo, NO
   dentro de `backend/`): job `tests` corre pytest con el lockfile; job
   `seguridad` corre `bandit` (código propio) y `pip-audit` (dependencias,
-  contra ambos lockfiles).
+  contra ambos lockfiles). **Confirmado en verde contra GitHub Actions real**
+  desde la Sesión 6 (repo: `github.com/Elkinn77/MEDICERCA`, rama `main`).
 - Tests: `pytest` con SQLite temporal, fixtures en `tests/conftest.py`
   (`client`, `db_session`, `usuario_factory`, `token_factory`, `ips_db`).
-  **48 tests, todos pasan** al día de hoy. Correr desde `backend/`.
+  **51 tests, todos pasan** al día de hoy. Correr desde `backend/`.
 
 ## Estado real (IMPORTANTE)
-El archivo de contexto viejo del proyecto ("CONTINUACION_DE_LO_YA_REALIZADO...",
-si todavía aparece en algún zip antiguo) describe una versión **muy
-desactualizada** — ignóralo. Este archivo (`CONTEXTO`) es el que hay que leer,
-y aun así: **antes de asumir que algo falta, lee el código real**, no te
-bases solo en este resumen — puede quedar desactualizado a medida que se
-avanza.
+Antes de asumir que algo falta, **lee el código real**, no te bases solo en
+este resumen — puede quedar desactualizado a medida que se avanza.
+
+## Datos de demo (`app/seed.py`)
+Correr con `docker compose exec backend python -m app.seed`. Es idempotente
+(usa `obtener_o_crear`, se puede correr varias veces sin duplicar nada).
+**Alcance actual: solo Bogotá** (ver Sesión 8) — 10 puntos de venta
+repartidos por la ciudad, 3 medicamentos (Acetaminofén OTC, Losartán RX,
+Tramadol RX+control especial), 3 IPS, 2 EPS. Los IDs de todo esto (puntos de
+venta, medicamentos, usuarios) **pueden variar entre sesiones** si el seed
+se corre más de una vez sobre datos ya existentes o si se hace
+`docker compose down -v` (que borra todo) — **siempre confirmar los IDs
+reales con una consulta a la base antes de asumirlos**, no copiar IDs de
+sesiones anteriores de este documento.
 
 ## Ya corregido / implementado (sesiones anteriores + esta)
 
@@ -57,180 +71,168 @@ medicamento RX. Se agregó `medicamento_id` a `OrdenMedica`, se valida en
 Migración: `alembic/ips/versions/20260814_02_orden_medica_medicamento_id.py`.
 
 ### Sesión 2 — tests que faltaban
-Se agregaron (archivos nuevos en `backend/tests/`, no se tocaron los
-existentes):
-- `test_domicilios_ordenes_casos_borde.py`: sin token (401), usuario sin
-  afiliación vigente (403), orden/punto de venta inexistente (404), orden de
-  otro paciente (403), límite exacto OTC-no-requiere-orden-aprobada, y
-  `GET`/`PATCH` de domicilios (antes sin ningún test).
-- `test_flujo_end_to_end.py`: registro → verificación OTP → login real →
-  alta de medicamento → carga de orden → rechazo por pendiente (422) →
-  aprobación → domicilio → actualización de estado hasta `entregado`, todo
-  por HTTP real (no atajos de fixtures).
+Se agregaron `test_domicilios_ordenes_casos_borde.py` y
+`test_flujo_end_to_end.py` (ver detalle en versiones anteriores de este
+archivo si hace falta).
 
 ### Sesión 3 — rate limiting, manejo global de errores, validaciones, producción
-**Rate limiting (`slowapi`, por IP):**
-- `app/core/rate_limit.py`: `Limiter` compartido.
-- En `auth.py`: `solicitar-cambio-password` 5/min (el riesgo concreto que
-  señalaba el backlog — no bloquea por cuenta, por diseño no revela si el
-  correo existe), `register` y `confirmar-cambio-password` 10/min, `login` y
-  `verificar-registro` 20/min (capa extra; esos dos ya bloquean por cuenta).
-- **Detalle importante para quien toque tests de auth**: el `Limiter` guarda
-  su estado en memoria de proceso, fuera del ciclo de `client`/
-  `reset_databases`. Hay un fixture `autouse` en `conftest.py`
-  (`reset_rate_limiter`) que llama `limiter.reset()` antes de cada test — si
-  se agregan más límites y algún test empieza a fallar con 429 inesperado,
-  revisar ese fixture primero, no asumir que es un bug de lógica.
-
-**Manejo global de errores:**
-- `@app.exception_handler(Exception)` en `main.py`: loguea el traceback
-  completo server-side (`logger.exception(...)`) y devuelve
-  `{"detail": "Error interno del servidor..."}` con 500, sin filtrar nada.
-  No interfiere con `HTTPException` ni `RequestValidationError` (tienen
-  prioridad, son manejadores más específicos de FastAPI).
-
-**Validaciones de entrada:**
-- `lat`/`lng` con rango (`-90/90`, `-180/180`) vía `Field(ge=..., le=...)` en
-  `ConsultaDisponibilidad` y en `DomicilioEstadoUpdate`.
-- `archivo_url` cambiado de `str` a `HttpUrl` en `OrdenMedicaCreate`.
-  **Cuidado**: `HttpUrl` en Pydantic v2 NO es `str` — hay que convertirlo
-  explícitamente (`str(payload.archivo_url)`) antes de guardarlo en la
-  columna `String` de SQLAlchemy. Ya está hecho en `routes/ordenes.py`; si
-  se agrega otro campo `HttpUrl` en el futuro, aplicar el mismo patrón.
-
-**Paginación:**
-- `app/schemas/pagina.py`: `Pagina[T]` genérico (`items`, `total`, `skip`,
-  `limit`). Aplicado a `GET /medicamentos` y `GET /ips` con
-  `skip: int = Query(0, ge=0)`, `limit: int = Query(50, ge=1, le=200)`.
-  Cambia la forma de la respuesta de esos dos endpoints (antes era una lista
-  plana, ahora es un objeto con `items`/`total`/`skip`/`limit`) — si hay un
-  frontend o cliente ya integrado contra la forma vieja, avisar.
-
-**Producción:**
-- `Dockerfile`: usuario no-root (`groupadd`/`useradd` + `USER app`) y
-  `HEALTHCHECK` que reutiliza `/api/v1/health` (valida las 4 bases de datos,
-  no solo que el proceso responda) vía `python -c "urllib.request..."` (sin
-  instalar curl solo para esto). **No se pudo build-testear** (sin Docker
-  disponible en el entorno donde se hizo este cambio) — probar localmente
-  con `docker compose up --build` antes de confiar en él a ciegas.
-- Lockfile con `pip-compile` (ver arriba). Verificado end-to-end: venv
-  limpio + `pip install -r requirements-dev.txt` + `pytest` → 48/48 pasan.
-- `bandit -r app` corre limpio (0 issues). Se corrigió un hallazgo real de
-  camino: `app/core/otp.py` generaba el código OTP con `random.randint`
-  (no criptográfico) — se cambió a `secrets.randbelow` (CSPRNG), porque ese
-  código protege registro y cambio de contraseña. Dos falsos positivos
-  (`B105` sobre un valor canario de config y sobre un discriminador de
-  enum) se marcaron con `# nosec B105` y una línea explicando por qué no
-  aplica — si bandit vuelve a fallar en el futuro, ese es el patrón a
-  seguir (nunca silenciar sin justificar).
-- `pip-audit` corre limpio salvo `PYSEC-2026-1325` (timing attack tipo
-  Minerva en `ecdsa`, dependencia transitiva de `python-jose`). Se ignora
-  explícitamente en el workflow de CI (`--ignore-vuln PYSEC-2026-1325`) con
-  un comentario: esta app firma JWT con `HS256`, no con ningún algoritmo
-  ECDSA, así que el código vulnerable de `ecdsa` nunca se ejecuta. El
-  proyecto `ecdsa` no planea arreglarlo (ataques de canal lateral fuera de
-  alcance para ellos), así que no hay versión "fix" a la que subir. Si en
-  algún momento se cambia el algoritmo JWT a algo basado en ECDSA (ES256,
-  etc.), **revisar esto de nuevo** — ahí sí importaría.
-- `.github/workflows/ci.yml` (en la raíz del repo): job `tests` (pytest) +
-  job `seguridad` (bandit + pip-audit). No está build-testeado contra
-  GitHub real (no hay acceso a Actions desde este entorno) — el primer push
-  real a un repo con este workflow es la prueba de fuego.
-
-### Limpieza de basura encontrada en el zip
-Al analizar el zip para esta sesión se encontraron y eliminaron dos cosas
-que NO tienen que ver con el proyecto en sí, para que no confundan a quien
-siga:
-- Una carpeta `tests/` duplicada y desactualizada en la raíz del repo
-  (fuera de `backend/`) — pytest nunca la usa (`testpaths=["tests"]` en
-  `backend/pyproject.toml` es relativo a `backend/`). Si en algún zip futuro
-  vuelve a aparecer una carpeta `tests/` fuera de `backend/`, es basura de
-  empaquetado, no algo intencional.
-- Un archivo llamado literalmente `=0.1.9` dentro de `backend/` — era un
-  archivo basura generado por un error de shell en una sesión anterior
-  (un `pip install paquete>=version` sin comillas, donde bash interpretó
-  `>=0.1.9` como una redirección). Ya no debería existir; si reaparece algo
-  con un nombre raro empezando en `=`, es la misma clase de error.
+- Rate limiting con `slowapi` en endpoints de auth sensibles.
+  **Cuidado**: el `Limiter` guarda estado en memoria; hay un fixture
+  `autouse` (`reset_rate_limiter`) en `conftest.py` que lo resetea antes de
+  cada test — si un test empieza a fallar con 429 inesperado, revisar ahí
+  primero.
+- Manejador global de errores no controlados (500 sin filtrar stack trace).
+- Validaciones: `lat`/`lng` con rango, `archivo_url` como `HttpUrl`
+  (recordar `str(payload.archivo_url)` antes de guardarlo en columna
+  `String`).
+- Paginación (`Pagina[T]`) en `GET /medicamentos` y `GET /ips`.
+- `Dockerfile`: usuario no-root + `HEALTHCHECK` sobre `/api/v1/health`.
+- `bandit` limpio (0 issues); OTP generado con `secrets.randbelow` (CSPRNG),
+  no `random.randint`.
+- `pip-audit` limpio salvo `PYSEC-2026-1325` (ecdsa, no aplica porque la app
+  firma con HS256, no ECDSA) — ignorado explícitamente en CI con comentario.
 
 ### Sesión 4 — timing side-channel en login
-Otra IA (revisor externo) detectó que `POST /api/v1/auth/login` filtraba por
-tiempo de respuesta si un correo estaba registrado: cuando el usuario no
-existía, se respondía 401 casi al instante (sin tocar bcrypt); cuando existía
-pero la contraseña era incorrecta, corría `verify_password` (bcrypt,
-~100-300ms) antes del 401. Esa diferencia permite enumerar correos
-registrados por fuerza bruta, aunque el mensaje de error sea idéntico en
-ambos casos.
+`POST /api/v1/auth/login` filtraba por tiempo de respuesta si un correo
+existía o no (bcrypt solo corría si el usuario existía). **Fix**:
+`verify_password_tiempo_constante` en `app/core/security.py` corre bcrypt
+contra un hash señuelo fijo cuando el usuario no existe, para igualar el
+tiempo de ambas ramas. **Cuidado con el short-circuit de `or`**: escribir
+`if not usuario or not verify_password_tiempo_constante(...)` nunca llama a
+la función cuando `usuario` es `None` (Python no evalúa el segundo operando),
+reintroduciendo el mismo timing leak. La versión correcta calcula
+`password_valida` en una línea aparte, siempre, antes del `if`.
 
-**Fix**: `app/core/security.py` ahora tiene `verify_password_tiempo_constante`,
-que corre bcrypt contra un hash señuelo fijo (`HASH_SENUELO`, calculado una
-sola vez al importar el módulo) cuando `password_hash` es `None`, así ambas
-ramas de `login()` pagan el mismo costo. `verify_password` (la función
-original) se mantiene como base interna; ya no se usa directo en ningún
-route.
+### Sesión 5 — verificado con Docker real
+`docker compose up --build` deja los 5 contenedores `(healthy)` y
+`GET /api/v1/health` responde `ok` con las 4 bases en `true`. Se corrigió un
+bug cosmético en los healthchecks de `db_ips1/2/3` (`pg_isready -U medicerca`
+sin `-d` asumía nombre de base = nombre de usuario) — se agregó `-d ips1`
+etc. a cada uno.
 
-**Cuidado con el short-circuit de `or`** (bug real que se cometió y se
-corrigió en la misma sesión): escribir
-`if not usuario or not verify_password_tiempo_constante(...)` es incorrecto,
-porque Python nunca evalúa el segundo operando si `not usuario` ya es
-`True` — o sea, nunca se llamaría a bcrypt cuando el usuario no existe, y
-volvería el mismo timing leak que se quería arreglar. La versión correcta
-calcula `password_valida` en una línea aparte, siempre, antes del `if`. Ver
-`login()` en `auth.py`.
+### Sesión 6 — historial de estados de domicilio + motor de disponibilidad desacoplado
+**Implementado:**
+- Nueva tabla `historial_estado_domicilio` (una fila por cada cambio de
+  estado, con timestamp, en vez de sobrescribir). Migración Alembic también
+  agregada (`alembic/ips/versions/20260816_03_historial_estado_domicilio.py`)
+  por completitud, aunque en desarrollo local `AUTO_CREATE_SCHEMA` la crea
+  sola.
+- Nuevo endpoint `GET /api/v1/domicilios/{ips_id}/{domicilio_id}/historial`.
+  **Regla de acceso**: mismo control que `GET /{ips_id}/{domicilio_id}` —
+  solo el paciente dueño puede verlo, sin excepción de rol (ni el regente).
+- Motor de disponibilidad desacoplado detrás de una interfaz
+  `CalculadorDistancia` (`app/core/availability_engine.py`), con
+  `DistanciaLineaRecta` (Haversine) como única implementación hoy. Preparado
+  para integrar Google Maps más adelante (tesis) sin reescribir la lógica de
+  negocio — solo escribir una clase nueva que cumpla el mismo contrato.
+- **51/51 tests pasan.**
 
-Test agregado: `test_login_correo_inexistente_tarda_similar_a_password_incorrecta`
-en `tests/test_auth.py`. Compara duraciones con un margen amplio (>50% del
-tiempo de la rama "contraseña incorrecta"), a propósito, para no ser un test
-frágil por ruido de entorno/CI — el objetivo es detectar si alguien vuelve a
-saltarse bcrypt por completo, no medir milisegundos exactos. **48 → 49
-tests, todos pasan.**
+**Confirmado subido a GitHub y CI en verde** (esto estaba pendiente al
+cierre de la Sesión 6 original, ya se completó): `git push` hecho, ambos
+jobs (`tests`, `seguridad`) pasaron en GitHub Actions real.
 
-### Sesión 5 — verificado con Docker real (pendiente #1 cerrado)
-El usuario (sin experiencia previa en Docker) instaló Docker Desktop, resolvió
-un cuelgue de WSL2 con `wsl --update` + `wsl --shutdown`, y corrió
-`docker compose up --build` contra el `docker-compose.yml` real. **Resultado:
-los 5 contenedores quedan `(healthy)`** (`docker ps` confirmado) y
-`GET /api/v1/health` responde `{"status":"ok", ...}` con las 4 bases de datos
-en `true`. El Dockerfile (usuario no-root, healthcheck sin curl) y el compose
-(orden de arranque vía `depends_on: condition: service_healthy`) funcionan
-de punta a punta. **Ya no es un pendiente.**
+**Hallazgos / cuidados:**
+- El paciente queda atado a su `ips_id` de afiliación desde el registro y
+  **no puede operar en otra IPS** — `POST /ordenes` da 403 si el `ips_id`
+  del payload no coincide con la afiliación vigente. No tiene test explícito
+  todavía (queda como pendiente menor).
+- El enum `rolusuario` en Postgres usa valores en **mayúsculas**
+  (`PACIENTE`, `REGENTE`) aunque la API los serializa en minúscula — si se
+  edita a mano con SQL directo, usar mayúsculas.
+- `eps_id` en el registro **no se valida contra el catálogo** (a diferencia
+  de `ips_id`, que sí da 404 si no existe). Se puede registrar un usuario
+  con un `eps_id` que no exista en la tabla `eps` sin ningún error — es
+  decorativo hoy, no afecta ninguna regla de negocio. Detectado en Sesión 7,
+  queda como mejora menor no urgente.
 
-De paso se encontró y corrigió un bug cosmético (no afectaba a la
-aplicación, solo ensuciaba los logs): el healthcheck de `db_ips1`/`db_ips2`/
-`db_ips3` en `infra/docker-compose.yml` era `pg_isready -U medicerca` sin
-`-d`, y `pg_isready` sin `-d` asume que el nombre de la base es igual al del
-usuario (`medicerca`) — pero esas 3 bases se llaman `ips1`/`ips2`/`ips3`, no
-`medicerca`. Esto generaba un `FATAL: database "medicerca" does not exist`
-repetido cada 5s en los logs de esos 3 contenedores, aunque
-`pg_isready` seguía reportando "accepting connections" igual (por eso los
-contenedores sí marcaban `healthy` y la app funcionaba bien: SQLAlchemy usa
-la URL de conexión correcta desde `config.py`, no pasa por este healthcheck).
-Fix: se agregó `-d ips1`/`-d ips2`/`-d ips3` a cada healthcheck respectivo.
-Nadie necesita volver a tocar esto salvo que cambien los nombres de las
-bases de datos de las IPS.
+### Sesión 7 — pruebas manuales de las 3 reglas de elegibilidad para domicilio
+Se probaron a mano, con datos reales, vía Swagger + Docker, los 3 casos de
+la regla de negocio central del proyecto (`app/core/legal_rules.py`):
+
+1. **OTC (Acetaminofén)**: domicilio directo, sin necesitar orden aprobada.
+   Confirmado en sesiones anteriores.
+2. **RX simple (Losartán)**: `POST /domicilios` da `422` ("requiere fórmula
+   médica aprobada") mientras la orden está `pendiente`; una vez el regente
+   la aprueba (`POST /ordenes/{ips_id}/{orden_id}/aprobar`), el mismo
+   request da `201`. Confirmado end-to-end.
+3. **RX + control especial (Tramadol)**: `POST /domicilios` da `422`
+   ("solo se entregan por recogida presencial") **incluso con la orden ya
+   aprobada** — la regla de control especial tiene prioridad absoluta.
+   Confirmado end-to-end, incluyendo el caso "ya aprobada" (el más
+   importante de verificar, porque es donde un bug sería más peligroso).
+
+No se encontraron bugs nuevos en esta sesión — la lógica de negocio ya
+implementada funciona correctamente en los 3 casos.
+
+**Nota operativa para quien pruebe esto de nuevo**: cambiar el rol de un
+usuario a `REGENTE` no tiene endpoint público (por diseño) — se hace
+directo en la base: `UPDATE usuario SET rol = 'REGENTE' WHERE correo = '...'`
+contra `db_central`. Importante: si el usuario ya había hecho login ANTES
+de la promoción, su token viejo sigue diciendo "paciente" (el rol se
+congela en el momento del login) — hay que volver a hacer login después de
+promoverlo para que el nuevo token refleje el rol actualizado.
+
+### Sesión 8 — datos de demo enfocados solo en Bogotá (decisión de producto)
+El proyecto originalmente tenía puntos de venta sueltos en Medellín (1) y
+Cali (1), además de 3 en Bogotá — decisión consciente de simplificar el
+alcance de la demo: **se quitaron los puntos fuera de Bogotá y se
+expandió a 10 puntos, todos en Bogotá**, repartidos en zonas reales
+(Chapinero, Rosales, Kennedy, Usaquén — IPS 1; Suba, Teusaquillo, Engativá —
+IPS 2; Fontibón, Puente Aranda, Ciudad Bolívar — IPS 3), con coordenadas
+reales de cada zona para que el cálculo de "punto más cercano" tenga sentido
+geográfico de verdad en la demo. Esto es un cambio de **contenido**
+(`app/seed.py`), no de arquitectura — el motor de disponibilidad y el resto
+del código no se tocaron.
+
+Verificado con Postgres real antes de entregar (idempotencia probada
+corriendo el seed dos veces, sin duplicar nada) y confirmado en vivo por el
+usuario vía Swagger: simulando vivir en Rosales y buscando Losartán, el
+sistema devuelve correctamente 4 puntos con stock en Bogotá, con
+**FarmaCentro Usaquén marcado como `punto_mas_cercano`** (geográficamente
+correcto) y el resto como `otro_punto_ciudad`.
+
+**Importante**: para aplicar este cambio hubo que hacer
+`docker compose down -v` (no solo `up --build`) para borrar los puntos
+viejos de Medellín/Cali, ya que `AUTO_CREATE_SCHEMA` solo agrega tablas
+nuevas, no borra filas viejas de datos de ejemplo que ya no se quieren. Al
+hacer esto se pierden TODOS los datos (usuarios, órdenes, domicilios de
+pruebas anteriores también) — es esperado y intencional cuando se cambia el
+seed, pero hay que avisar si alguien no quiere perder datos de prueba en
+curso.
+
+**Pendiente al cierre de esta sesión**: hacer `git push` de este cambio
+(un solo archivo, `app/seed.py`) y confirmar CI verde — si estás leyendo
+esto en una sesión posterior, primero confirma si ya se hizo.
 
 ## Pendiente por hacer (en orden de prioridad sugerido)
 
-### 1. Verificar el workflow de CI contra GitHub real
-`.github/workflows/ci.yml` nunca corrió contra GitHub Actions de verdad.
-Al pushear, confirmar que ambos jobs (`tests`, `seguridad`) pasan en verde.
-(Este es ahora el único pendiente de verificación externa — Docker ya se
-confirmó en la Sesión 5.)
-
-### 2. Capa de servicios (mejora estructural, no urgente)
+### 1. Capa de servicios (mejora estructural, no urgente)
 `app/services/` existe pero está vacía. La lógica de negocio vive directo en
 las rutas (`ordenes.py`, `domicilios.py`, `auth.py`). Funciona bien al tamaño
 actual; si el proyecto sigue creciendo, vale la pena extraer
 `DomicilioService`, `OrdenMedicaService`, etc. para evitar duplicación.
 
-### 4. Ideas menores no bloqueantes
+### 2. Ideas menores no bloqueantes
+- `eps_id` no se valida contra el catálogo en el registro (ver Sesión 6).
+- No hay test explícito de "paciente no puede crear orden en una IPS que no
+  es la suya" (comportamiento ya correcto, solo falta el test formal).
 - Los mensajes de error 429 del rate limiter exponen el string del límite
-  (ej. "5 per 1 minute") — no es sensible, pero si se quiere un mensaje más
-  amigable para el cliente final, se puede personalizar con el parámetro
-  `error_message` de `@limiter.limit(...)`.
-- No hay headers `X-RateLimit-*` en las respuestas (se dejó
-  `headers_enabled=False` por simplicidad). Si el frontend quiere mostrar
-  "te quedan N intentos", hay que activarlo en `Limiter(...)` y agregar
-  `SlowAPIMiddleware`.
+  (ej. "5 per 1 minute") — no sensible, pero se puede personalizar con
+  `error_message` de `@limiter.limit(...)` si se quiere.
+- No hay headers `X-RateLimit-*` en las respuestas (`headers_enabled=False`
+  por simplicidad). Si el frontend quiere mostrar "te quedan N intentos",
+  hay que activarlo en `Limiter(...)` y agregar `SlowAPIMiddleware`.
+- No hay endpoints para listar EPS desde la API (solo se usa como tabla de
+  referencia con FK).
+
+### 3. Geolocalización real con Google Maps (decisión de alcance, no urgente)
+El cálculo de "punto más cercano" usa distancia en línea recta (Haversine),
+no rutas reales por calle, y no hay geocodificación de dirección de texto a
+coordenadas — el cliente manda `lat`/`lng` directo. Esto es **intencional**:
+se implementaría más adelante, en la fase de tesis, ya con frontend y
+despliegue real. El motor ya está preparado para ese cambio (ver
+`CalculadorDistancia` en Sesión 6) sin necesitar reescribir la lógica de
+negocio.
 
 ## Cómo verificar cualquier cambio
 ```bash
@@ -239,14 +241,6 @@ python3 -m venv /tmp/venv
 /tmp/venv/bin/pip install -r requirements-dev.txt
 /tmp/venv/bin/python -m pytest -q
 ```
-Todos los tests usan SQLite temporal (ver `tests/conftest.py`), no necesitan
-Docker ni PostgreSQL para correr. Para regenerar los lockfiles tras cambiar
-`requirements.in` o `requirements-dev.in`:
-```bash
-pip install pip-tools
-pip-compile requirements.in -o requirements.txt
-pip-compile requirements-dev.in -o requirements-dev.txt
-```
 Para correr los mismos chequeos que CI, localmente:
 ```bash
 pip install bandit pip-audit
@@ -254,59 +248,9 @@ bandit -r app
 pip-audit -r requirements.txt --ignore-vuln PYSEC-2026-1325
 ```
 
-### Sesión 6 — historial de estados de domicilio + motor de disponibilidad desacoplado
-
-**Implementado:**
-- Nueva tabla `historial_estado_domicilio` (una fila por cada cambio de
-  estado del domicilio, con timestamp, en vez de sobrescribir el estado
-  actual). Se crea sola en las 3 bases de IPS gracias a
-  `AUTO_CREATE_SCHEMA=true`, no requirió migración manual de Alembic.
-- Nuevo endpoint `GET /api/v1/domicilios/{ips_id}/{domicilio_id}/historial`.
-  **Regla de acceso importante**: reutiliza el mismo control que
-  `GET /{ips_id}/{domicilio_id}` — solo el paciente dueño del pedido puede
-  verlo, **sin excepción de rol**. Ni siquiera el regente que actualiza la
-  logística tiene acceso a este endpoint. Confirmado manualmente: con token
-  de regente da 403 "No tienes acceso a este domicilio"; con token del
-  paciente dueño, 200 con el arreglo completo.
-- Motor de disponibilidad desacoplado detrás de una interfaz
-  `CalculadorDistancia`, para poder integrar Google Maps más adelante sin
-  reescribir la lógica de negocio (queda para la tesis, no ahora).
-- **51/51 tests pasan.**
-
-**Verificado manualmente end-to-end vía Swagger + Docker real** (5
-contenedores healthy, `docker compose up --build`), flujo completo:
-registro → verificación OTP → login → creación de orden (RX, Losartán) →
-intento de aprobación con rol paciente (403 esperado, confirma protección de
-rol) → cambio de rol a REGENTE directo en la base (no hay endpoint público
-para esto, por diseño) → aprobación de la orden → consulta de disponibilidad
-→ creación de domicilio → actualización de estado (regente) → consulta de
-historial (paciente) con dos filas acumuladas.
-
-**Hallazgos / cuidados para la próxima sesión:**
-- El paciente queda atado a su `ips_id` de afiliación desde el registro y
-  **no puede operar en otra IPS** aunque haya stock ahí — `POST /ordenes`
-  devuelve 403 "La operacion solo esta permitida en la IPS vigente del
-  usuario" si el `ips_id` del payload no coincide. Confirmar que esto está
-  cubierto por un test explícito; si no, agregarlo.
-- El enum `rolusuario` en Postgres usa valores en **mayúsculas**
-  (`PACIENTE`, `REGENTE`), aunque la API los serializa en minúscula
-  (`"rol": "paciente"`) — si se toca ese enum a mano (SQL directo), usar
-  mayúsculas o falla el `UPDATE`.
-- Los datos demo de `inventario` pueden traer `cantidad = 0` en algunos
-  puntos de venta — el endpoint de `disponibilidad` los filtra
-  correctamente (no los muestra), es el comportamiento esperado, no un bug.
-- No hay endpoints para listar EPS desde la API (solo se usa como tabla de
-  referencia con FK) — si se necesita en el futuro, falta exponerlo.
-- `PATCH /domicilios/{ips_id}/{domicilio_id}/estado` requiere rol regente
-  (staff de la IPS); el paciente solo puede leer su tracking, no
-  actualizarlo. Ya estaba documentado en la descripción del endpoint,
-  confirmado en la prueba.
-
-**Pendiente:** `git push` de estos cambios (aún no hecho al cierre de esta
-sesión) y confirmar que el CI (`tests` + `seguridad`) pasa en verde contra
-GitHub Actions real.
-
 ## Instrucción para la próxima IA
 Antes de asumir que algo falta, **lee el código real**, no te bases solo en
 este resumen. Este archivo puede quedar desactualizado a medida que se
-avanza — si algo aquí contradice el código, el código manda.
+avanza — si algo aquí contradice el código, el código manda. Antes de
+asumir un ID de punto de venta/medicamento/usuario, confírmalo con una
+consulta real a la base — los IDs cambian entre sesiones.
