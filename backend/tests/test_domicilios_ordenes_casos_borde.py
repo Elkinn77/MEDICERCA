@@ -293,6 +293,62 @@ def test_paciente_no_puede_ver_historial_de_domicilio_ajeno(
     assert propio.json()[0]["estado"] == "confirmado"
 
 
+def test_mis_domicilios_solo_devuelve_los_del_usuario_autenticado(
+    client: TestClient, db_session, ips_db, token_factory
+) -> None:
+    medicamento_id = _crear_medicamento(db_session, rx=False, sufijo="MISDOM")
+    orden_propia = _crear_orden(ips_db, estado=EstadoOrden.APROBADA, medicamento_id=medicamento_id, cedula="6060606060")
+    orden_ajena = _crear_orden(ips_db, estado=EstadoOrden.APROBADA, medicamento_id=medicamento_id, cedula="7070707070")
+    punto_id = _crear_punto_venta(ips_db)
+    dueno = token_factory(cedula="6060606060", ips_id=1)
+    otro = token_factory(cedula="7070707070", ips_id=1)
+
+    client.post(
+        "/api/v1/domicilios",
+        json={"ips_id": 1, "orden_id": orden_propia, "punto_origen_id": punto_id, "medicamento_id": medicamento_id},
+        headers=dueno,
+    )
+    client.post(
+        "/api/v1/domicilios",
+        json={"ips_id": 1, "orden_id": orden_ajena, "punto_origen_id": punto_id, "medicamento_id": medicamento_id},
+        headers=otro,
+    )
+
+    mios = client.get("/api/v1/domicilios/mias", headers=dueno)
+    assert mios.status_code == 200
+    assert len(mios.json()) == 1
+    assert mios.json()[0]["orden_id"] == orden_propia
+
+
+def test_domicilios_activos_solo_para_regente_y_excluye_entregados(
+    client: TestClient, db_session, ips_db, token_factory
+) -> None:
+    medicamento_id = _crear_medicamento(db_session, rx=False, sufijo="DOMACT")
+    orden_id = _crear_orden(ips_db, estado=EstadoOrden.APROBADA, medicamento_id=medicamento_id, cedula="8080808080")
+    punto_id = _crear_punto_venta(ips_db)
+    paciente = token_factory(cedula="8080808080", ips_id=1)
+
+    paciente_intenta = client.get("/api/v1/domicilios/activos", headers=paciente)
+    assert paciente_intenta.status_code == 403
+
+    creado = client.post(
+        "/api/v1/domicilios",
+        json={"ips_id": 1, "orden_id": orden_id, "punto_origen_id": punto_id, "medicamento_id": medicamento_id},
+        headers=paciente,
+    )
+    domicilio_id = creado.json()["id"]
+
+    regente = token_factory(rol=RolUsuario.REGENTE, ips_id=1)
+    activos = client.get("/api/v1/domicilios/activos", headers=regente)
+    assert activos.status_code == 200
+    assert any(d["id"] == domicilio_id for d in activos.json())
+
+    client.patch(f"/api/v1/domicilios/1/{domicilio_id}/estado", json={"estado": "entregado"}, headers=regente)
+
+    activos_despues = client.get("/api/v1/domicilios/activos", headers=regente)
+    assert all(d["id"] != domicilio_id for d in activos_despues.json())
+
+
 def test_regente_no_puede_ver_historial_de_domicilio_de_otro_paciente(
     client: TestClient, db_session, ips_db, token_factory
 ) -> None:

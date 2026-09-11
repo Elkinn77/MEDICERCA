@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.afiliaciones import exigir_ips_del_usuario
+from app.core.afiliaciones import exigir_ips_del_usuario, obtener_ips_vigente_usuario
 from app.core.deps import get_current_user
 from app.core.legal_rules import MedicamentoNoElegibleParaDomicilio, validar_domicilio_o_falla
 from app.database import get_db
 from app.ips_db import ips_session
 from app.models.medicamento import Medicamento
 from app.models.usuario import RolUsuario, Usuario
-from app.models_ips import Domicilio, EstadoOrden, HistorialEstadoDomicilio, OrdenMedica, PuntoVenta
+from app.models_ips import Domicilio, EstadoDomicilio, EstadoOrden, HistorialEstadoDomicilio, OrdenMedica, PuntoVenta
 from app.schemas.pedido import DomicilioCreate, DomicilioEstadoUpdate, DomicilioOut, HistorialEstadoDomicilioOut
 
 router = APIRouter(prefix="/api/v1/domicilios", tags=["domicilios"])
@@ -68,6 +68,51 @@ def crear_domicilio(
         db.refresh(domicilio)
         db.expunge(domicilio)
         return domicilio
+
+
+@router.get("/mias", response_model=list[DomicilioOut])
+def mis_domicilios(
+    db_central: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+):
+    """Domicilios del usuario autenticado en su IPS vigente, mas recientes
+    primero. Sin esto, el unico modo de conocer un domicilio era recordar
+    a mano el id que devolvio POST /domicilios al crearlo."""
+    ips = obtener_ips_vigente_usuario(db_central, usuario)
+    with ips_session(ips) as db:
+        domicilios = (
+            db.query(Domicilio)
+            .join(OrdenMedica, Domicilio.orden_id == OrdenMedica.id)
+            .filter(OrdenMedica.usuario_cedula == usuario.cedula)
+            .order_by(Domicilio.id.desc())
+            .all()
+        )
+        for domicilio in domicilios:
+            db.expunge(domicilio)
+        return domicilios
+
+
+@router.get("/activos", response_model=list[DomicilioOut])
+def domicilios_activos(
+    db_central: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+):
+    """Domicilios sin entregar en la IPS vigente del regente, para que
+    tenga una cola de trabajo sin depender de que el paciente le comparta
+    el id del domicilio por otro medio."""
+    if usuario.rol != RolUsuario.REGENTE:
+        raise HTTPException(status_code=403, detail="Esta accion requiere rol de regente")
+    ips = obtener_ips_vigente_usuario(db_central, usuario)
+    with ips_session(ips) as db:
+        domicilios = (
+            db.query(Domicilio)
+            .filter(Domicilio.estado != EstadoDomicilio.ENTREGADO)
+            .order_by(Domicilio.id)
+            .all()
+        )
+        for domicilio in domicilios:
+            db.expunge(domicilio)
+        return domicilios
 
 
 @router.get("/{ips_id}/{domicilio_id}", response_model=DomicilioOut)

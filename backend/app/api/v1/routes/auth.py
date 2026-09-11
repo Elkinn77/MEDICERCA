@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.afiliaciones import cambiar_afiliacion, obtener_ips_activa
-from app.core.deps import security_scheme
+from app.core.deps import get_current_user, security_scheme
 from app.core.otp import generar_codigo, validar_codigo
 from app.core.rate_limit import limiter
 from app.core.security import (
@@ -176,6 +176,15 @@ def confirmar_cambio_password(request: Request, payload: ConfirmarCambioPassword
     usuario.password_hash = hash_password(payload.nueva_password)
     db.commit()
     db.refresh(usuario)
+    return usuario
+
+
+@router.get("/me", response_model=UsuarioOut)
+def yo(usuario: Usuario = Depends(get_current_user)):
+    """Identidad del usuario autenticado (rol, ips_id, etc.). El JWT solo
+    guarda 'sub' (correo), así que sin este endpoint un cliente no tiene
+    forma de saber, tras iniciar sesión, si el usuario es paciente o
+    regente ni a qué IPS está afiliado."""
     return usuario
 
 

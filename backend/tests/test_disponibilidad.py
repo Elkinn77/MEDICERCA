@@ -85,6 +85,33 @@ def test_disponibilidad_agrega_las_tres_ips_y_prioriza_cercania(
     assert resultados[0]["cantidad"] == 12
 
 
+def test_comparacion_de_ciudad_ignora_tildes_y_mayusculas(
+    client: TestClient, catalogo_e_inventario: dict[str, int]
+) -> None:
+    """El seed real del proyecto guarda 'Bogota' sin tilde (ver app/seed.py),
+    pero un usuario real escribe 'Bogotá' con tilde. Sin normalizar, esa
+    diferencia hacía que CADA resultado cayera en 'otra_ciudad' en vez de
+    'punto_mas_cercano'/'otro_punto_ciudad', aunque la sede sí estuviera en la
+    misma ciudad."""
+    response = client.post(
+        "/api/v1/disponibilidad",
+        json={
+            "medicamento_id": catalogo_e_inventario["otc"],
+            "lat_usuario": 4.6490,
+            "lng_usuario": -74.0602,
+            "ciudad_usuario": "BOGOTA",
+        },
+    )
+
+    assert response.status_code == 200
+    resultados = response.json()
+    assert [resultado["nivel"] for resultado in resultados] == [
+        "punto_mas_cercano",
+        "otro_punto_ciudad",
+        "otra_ciudad",
+    ]
+
+
 def test_sin_stock_informa_reabastecimiento_mas_proximo(
     client: TestClient, catalogo_e_inventario: dict[str, int]
 ) -> None:

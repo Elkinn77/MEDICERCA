@@ -1,0 +1,103 @@
+import { useEffect, useMemo, useState } from 'react'
+import { medicamentosApi, ordenesApi } from '../api'
+import { ApiError } from '../api/client'
+import { useAuth } from '../context/AuthContext'
+import { formatearFecha } from '../lib/format'
+import { Alert, Badge, Button, Card, CenteredLoader, EmptyState, PageHeader } from '../components/ui'
+
+export default function RegenteOrdenesPage() {
+  const { usuario } = useAuth()
+  const [ordenes, setOrdenes] = useState([])
+  const [medicamentos, setMedicamentos] = useState([])
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState('')
+  const [procesando, setProcesando] = useState(null)
+
+  const medicamentosPorId = useMemo(() => new Map(medicamentos.map((m) => [m.id, m])), [medicamentos])
+
+  const cargar = async () => {
+    setCargando(true)
+    setError('')
+    try {
+      const [pendientes, pagina] = await Promise.all([ordenesApi.pendientes(), medicamentosApi.listar({ limit: 200 })])
+      setOrdenes(pendientes)
+      setMedicamentos(pagina.items)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudieron cargar las órdenes pendientes.')
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  useEffect(() => {
+    cargar()
+  }, [])
+
+  const resolver = async (orden, accion) => {
+    setProcesando(orden.id)
+    setError('')
+    try {
+      if (accion === 'aprobar') await ordenesApi.aprobar(usuario.ips_id, orden.id)
+      else await ordenesApi.rechazar(usuario.ips_id, orden.id)
+      setOrdenes((prev) => prev.filter((o) => o.id !== orden.id))
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo procesar la orden.')
+    } finally {
+      setProcesando(null)
+    }
+  }
+
+  return (
+    <div>
+      <PageHeader title="Órdenes por aprobar" description="Fórmulas médicas pendientes de revisión en tu IPS." />
+
+      {error && <Alert variant="error">{error}</Alert>}
+
+      {cargando ? (
+        <CenteredLoader label="Cargando órdenes pendientes…" />
+      ) : ordenes.length === 0 ? (
+        <EmptyState title="No hay órdenes pendientes" description="Cuando un paciente cargue una fórmula, aparecerá aquí." />
+      ) : (
+        <div className="flex flex-col gap-3">
+          {ordenes.map((orden) => {
+            const medicamento = medicamentosPorId.get(orden.medicamento_id)
+            return (
+              <Card key={orden.id} className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-slate-900">
+                      {medicamento ? medicamento.nombre_comercial : `Medicamento #${orden.medicamento_id}`}
+                    </p>
+                    {medicamento && <Badge color={medicamento.condicion_venta === 'RX' ? 'yellow' : 'green'}>{medicamento.condicion_venta}</Badge>}
+                  </div>
+                  <p className="text-sm text-slate-500">Paciente (cédula): {orden.usuario_cedula}</p>
+                  <p className="text-xs text-slate-400">Cargada el {formatearFecha(orden.creado_en)}</p>
+                  <a
+                    href={orden.archivo_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-medium text-brand-700 hover:underline"
+                  >
+                    Ver fórmula adjunta
+                  </a>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    loading={procesando === orden.id}
+                    onClick={() => resolver(orden, 'rechazar')}
+                  >
+                    Rechazar
+                  </Button>
+                  <Button loading={procesando === orden.id} onClick={() => resolver(orden, 'aprobar')}>
+                    Aprobar
+                  </Button>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}

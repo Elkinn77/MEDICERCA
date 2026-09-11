@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.afiliaciones import exigir_ips_del_usuario
+from app.core.afiliaciones import exigir_ips_del_usuario, obtener_ips_vigente_usuario
 from app.core.deps import get_current_user
 from app.database import get_db
 from app.ips_db import ips_session
@@ -36,6 +36,70 @@ def cargar_orden(
         db.add(orden)
         db.commit()
         db.refresh(orden)
+        db.expunge(orden)
+        return orden
+
+
+@router.get("/mias", response_model=list[OrdenMedicaOut])
+def mis_ordenes(
+    db_central: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+):
+    """Ordenes cargadas por el usuario autenticado en su IPS vigente, mas
+    recientes primero. Sin este endpoint, la unica forma de conocer el
+    estado de una orden ya creada era recordar su id manualmente."""
+    ips = obtener_ips_vigente_usuario(db_central, usuario)
+    with ips_session(ips) as db:
+        ordenes = (
+            db.query(OrdenMedica)
+            .filter(OrdenMedica.usuario_cedula == usuario.cedula)
+            .order_by(OrdenMedica.creado_en.desc())
+            .all()
+        )
+        for orden in ordenes:
+            db.expunge(orden)
+        return ordenes
+
+
+@router.get("/pendientes", response_model=list[OrdenMedicaOut])
+def ordenes_pendientes(
+    db_central: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+):
+    """Cola de ordenes PENDIENTE en la IPS vigente del regente, para que
+    pueda aprobar/rechazar sin depender de que el paciente le pase el id
+    de la orden por otro medio."""
+    if usuario.rol != RolUsuario.REGENTE:
+        raise HTTPException(status_code=403, detail="Esta accion requiere rol de regente")
+    ips = obtener_ips_vigente_usuario(db_central, usuario)
+    with ips_session(ips) as db:
+        ordenes = (
+            db.query(OrdenMedica)
+            .filter(OrdenMedica.estado == EstadoOrden.PENDIENTE)
+            .order_by(OrdenMedica.creado_en)
+            .all()
+        )
+        for orden in ordenes:
+            db.expunge(orden)
+        return ordenes
+
+
+@router.get("/{ips_id}/{orden_id}", response_model=OrdenMedicaOut)
+def obtener_orden(
+    ips_id: int,
+    orden_id: int,
+    db_central: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+):
+    """Mismo control de acceso que GET /domicilios/{ips_id}/{domicilio_id}:
+    el paciente dueño de la orden, o un regente de esa misma IPS."""
+    ips = exigir_ips_del_usuario(db_central, usuario, ips_id)
+    with ips_session(ips) as db:
+        orden = db.get(OrdenMedica, orden_id)
+        if not orden:
+            raise HTTPException(status_code=404, detail="Orden no encontrada")
+        if usuario.rol != RolUsuario.REGENTE and orden.usuario_cedula != usuario.cedula:
+            raise HTTPException(status_code=403, detail="No tienes acceso a esta orden")
         db.expunge(orden)
         return orden
 

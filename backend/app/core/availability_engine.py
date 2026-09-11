@@ -1,5 +1,6 @@
 """Interoperability gateway: aggregate availability from registered IPS systems."""
 import math
+import unicodedata
 from abc import ABC, abstractmethod
 
 from sqlalchemy.orm import Session
@@ -48,6 +49,15 @@ class DistanciaLineaRecta(CalculadorDistancia):
 calculador_distancia_por_defecto: CalculadorDistancia = DistanciaLineaRecta()
 
 
+def _normalizar_ciudad(texto: str) -> str:
+    """Minúsculas y sin tildes: sin esto, un usuario que escribe 'Bogotá' (con
+    tilde, como se escribe realmente) nunca coincide con el 'Bogota' sembrado
+    en la demo, y CADA resultado en su propia ciudad cae por error en el nivel
+    'otra_ciudad' en vez de 'punto_mas_cercano'/'otro_punto_ciudad'."""
+    sin_tildes = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode("ascii")
+    return sin_tildes.strip().lower()
+
+
 def _consultar_una_ips(ips: InstitucionPrestadora, medicamento_id: int) -> list[tuple[Inventario, PuntoVenta]]:
     with ips_session(ips) as db:
         filas = (
@@ -80,8 +90,9 @@ def buscar_disponibilidad(
 
     con_stock = [fila for fila in todas if fila[1].cantidad > 0]
     if con_stock:
-        misma_ciudad = [fila for fila in con_stock if fila[2].ciudad.lower() == ciudad_usuario.lower()]
-        otra_ciudad = [fila for fila in con_stock if fila[2].ciudad.lower() != ciudad_usuario.lower()]
+        ciudad_usuario_normalizada = _normalizar_ciudad(ciudad_usuario)
+        misma_ciudad = [fila for fila in con_stock if _normalizar_ciudad(fila[2].ciudad) == ciudad_usuario_normalizada]
+        otra_ciudad = [fila for fila in con_stock if _normalizar_ciudad(fila[2].ciudad) != ciudad_usuario_normalizada]
         misma_ciudad.sort(
             key=lambda fila: calculador.distancia_km(lat_usuario, lng_usuario, float(fila[2].lat), float(fila[2].lng))
         )
