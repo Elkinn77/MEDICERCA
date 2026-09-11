@@ -284,6 +284,25 @@ def test_login_correo_inexistente_tarda_similar_a_password_incorrecta(client: Te
     assert duracion_inexistente > duracion_existente * 0.5
 
 
+def test_me_devuelve_la_identidad_del_usuario_autenticado(client: TestClient, token_factory) -> None:
+    from app.models.usuario import RolUsuario
+
+    headers = token_factory(nombre="Regente Uno", rol=RolUsuario.REGENTE, ips_id=1)
+
+    respuesta = client.get("/api/v1/auth/me", headers=headers)
+
+    assert respuesta.status_code == 200
+    body = respuesta.json()
+    assert body["nombre"] == "Regente Uno"
+    assert body["rol"] == "regente"
+    assert body["ips_id"] == 1
+
+
+def test_me_sin_token_devuelve_401(client: TestClient) -> None:
+    respuesta = client.get("/api/v1/auth/me")
+    assert respuesta.status_code == 401
+
+
 def test_health_reporta_las_cuatro_bases_de_datos(client: TestClient) -> None:
     response = client.get("/api/v1/health")
     assert response.status_code == 200

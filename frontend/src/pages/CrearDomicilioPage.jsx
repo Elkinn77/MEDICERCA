@@ -1,0 +1,170 @@
+import { useState } from 'react'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { disponibilidadApi, domiciliosApi } from '../api'
+import { ApiError } from '../api/client'
+import { useAuth } from '../context/AuthContext'
+import { Alert, Button, Card, EmptyState, Input, PageHeader } from '../components/ui'
+
+export default function CrearDomicilioPage() {
+  const { usuario } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const orden = location.state?.orden
+  const medicamento = location.state?.medicamento
+
+  const [ciudad, setCiudad] = useState('Bogotá')
+  const [ubicacion, setUbicacion] = useState(null)
+  const [buscandoUbicacion, setBuscandoUbicacion] = useState(false)
+  const [puntosElegibles, setPuntosElegibles] = useState(null)
+  const [puntoSeleccionado, setPuntoSeleccionado] = useState(null)
+  const [error, setError] = useState('')
+  const [consultando, setConsultando] = useState(false)
+  const [confirmando, setConfirmando] = useState(false)
+
+  if (!orden) {
+    return <Navigate to="/ordenes" replace />
+  }
+
+  const solicitarUbicacion = () => {
+    setError('')
+    if (!navigator.geolocation) {
+      setError('Tu navegador no soporta geolocalización.')
+      return
+    }
+    setBuscandoUbicacion(true)
+    navigator.geolocation.getCurrentPosition(
+      (posicion) => {
+        setUbicacion({ lat: posicion.coords.latitude, lng: posicion.coords.longitude })
+        setBuscandoUbicacion(false)
+      },
+      () => {
+        setError('No pudimos acceder a tu ubicación.')
+        setBuscandoUbicacion(false)
+      },
+      { enableHighAccuracy: true, timeout: 8000 },
+    )
+  }
+
+  const buscarPuntos = async (evento) => {
+    evento.preventDefault()
+    setError('')
+    if (!ubicacion) {
+      setError('Primero comparte tu ubicación.')
+      return
+    }
+    setConsultando(true)
+    try {
+      const resultados = await disponibilidadApi.consultar({
+        medicamento_id: orden.medicamento_id,
+        lat_usuario: ubicacion.lat,
+        lng_usuario: ubicacion.lng,
+        ciudad_usuario: ciudad,
+      })
+      // Un domicilio solo puede salir de un punto de venta de TU propia IPS
+      // (así lo valida el backend), aunque el buscador de disponibilidad
+      // muestre resultados de las 3 IPS simuladas.
+      const propios = resultados.filter((r) => r.ips_id === usuario.ips_id && r.nivel !== 'no_disponible')
+      setPuntosElegibles(propios)
+      setPuntoSeleccionado(propios[0]?.punto_id ?? null)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo consultar disponibilidad.')
+    } finally {
+      setConsultando(false)
+    }
+  }
+
+  const confirmarDomicilio = async () => {
+    setError('')
+    if (!puntoSeleccionado) {
+      setError('Selecciona un punto de venta de origen.')
+      return
+    }
+    setConfirmando(true)
+    try {
+      const domicilio = await domiciliosApi.crear({
+        ips_id: usuario.ips_id,
+        orden_id: orden.id,
+        punto_origen_id: puntoSeleccionado,
+        medicamento_id: orden.medicamento_id,
+      })
+      navigate(`/domicilios/${usuario.ips_id}/${domicilio.id}`)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo crear el domicilio.')
+    } finally {
+      setConfirmando(false)
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl">
+      <PageHeader
+        title="Pedir a domicilio"
+        description={`Orden #${orden.id} — ${medicamento ? medicamento.nombre_comercial : `Medicamento #${orden.medicamento_id}`}`}
+      />
+
+      <Card>
+        <h2 className="font-semibold text-slate-900">1. Elige el punto de venta de origen</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Solo se muestran puntos de tu propia IPS con inventario disponible.
+        </p>
+
+        <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={buscarPuntos}>
+          <div className="min-w-[10rem] flex-1">
+            <Input label="Tu ciudad" value={ciudad} onChange={(e) => setCiudad(e.target.value)} required />
+          </div>
+          <Button type="button" variant="secondary" onClick={solicitarUbicacion} loading={buscandoUbicacion}>
+            {ubicacion ? 'Actualizar ubicación' : 'Usar mi ubicación'}
+          </Button>
+          <Button type="submit" loading={consultando}>
+            Buscar puntos
+          </Button>
+        </form>
+
+        {error && (
+          <div className="mt-4">
+            <Alert variant="error">{error}</Alert>
+          </div>
+        )}
+
+        {puntosElegibles && (
+          <div className="mt-6">
+            {puntosElegibles.length === 0 ? (
+              <EmptyState
+                title="No hay puntos de tu IPS con inventario"
+                description="Prueba de nuevo más tarde o consulta disponibilidad en otras IPS desde el catálogo."
+              />
+            ) : (
+              <div className="flex flex-col gap-3">
+                {puntosElegibles.map((punto) => (
+                  <label
+                    key={punto.punto_id}
+                    className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border p-4 transition ${
+                      puntoSeleccionado === punto.punto_id ? 'border-brand-500 bg-brand-50' : 'border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        name="punto"
+                        checked={puntoSeleccionado === punto.punto_id}
+                        onChange={() => setPuntoSeleccionado(punto.punto_id)}
+                      />
+                      <div>
+                        <p className="font-medium text-slate-800">{punto.punto_nombre}</p>
+                        <p className="text-sm text-slate-500">{punto.ciudad}</p>
+                      </div>
+                    </div>
+                    <span className="text-sm text-slate-600">Stock: {punto.cantidad}</span>
+                  </label>
+                ))}
+                <Button onClick={confirmarDomicilio} loading={confirmando} className="mt-2 self-start">
+                  Confirmar domicilio
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </Card>
+    </div>
+  )
+}
