@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { UserPlus } from 'lucide-react'
 import { authApi, ipsApi } from '../api'
 import { ApiError } from '../api/client'
 import { Alert, Button, Card, Input, Select } from '../components/ui'
@@ -47,17 +48,21 @@ export default function RegisterPage() {
   return (
     <div className="mx-auto max-w-md">
       <Card>
-        <h1 className="text-xl font-bold text-slate-900">Crea tu cuenta</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          El registro público solo crea cuentas de paciente. Te enviaremos un código de verificación.
+        <div className="mb-2 grid h-12 w-12 place-items-center rounded-xl bg-brand-50 text-brand-700">
+          <UserPlus className="h-6 w-6" aria-hidden="true" />
+        </div>
+        <h1 className="text-2xl font-extrabold text-navy-800">Crea tu cuenta</h1>
+        <p className="mt-1 text-base text-ink-soft">
+          El registro público solo crea cuentas de paciente. Te enviaremos un código de verificación por correo.
         </p>
 
-        <form className="mt-6 flex flex-col gap-4" onSubmit={enviar}>
+        <form className="mt-6 flex flex-col gap-5" onSubmit={enviar}>
           <Input label="Nombre completo" required value={form.nombre} onChange={actualizarCampo('nombre')} />
           <Input label="Cédula" required value={form.cedula} onChange={actualizarCampo('cedula')} />
           <Input
             label="Correo electrónico"
             type="email"
+            autoComplete="email"
             required
             value={form.correo}
             onChange={actualizarCampo('correo')}
@@ -65,21 +70,15 @@ export default function RegisterPage() {
           <Input
             label="Contraseña"
             type="password"
+            autoComplete="new-password"
             required
             minLength={8}
+            hint="Mínimo 8 caracteres, con una mayúscula, una minúscula y un número."
             value={form.password}
             onChange={actualizarCampo('password')}
           />
-          <p className="-mt-3 text-xs text-slate-400">
-            Mínimo 8 caracteres, con al menos una mayúscula, una minúscula y un número.
-          </p>
 
-          <Select
-            label="IPS a la que perteneces"
-            required
-            value={form.ips_id}
-            onChange={actualizarCampo('ips_id')}
-          >
+          <Select label="IPS a la que perteneces" required value={form.ips_id} onChange={actualizarCampo('ips_id')}>
             <option value="">Selecciona tu IPS…</option>
             {ipsDisponibles.map((ips) => (
               <option key={ips.id} value={ips.id}>
@@ -89,22 +88,23 @@ export default function RegisterPage() {
           </Select>
 
           <Input
-            label="EPS (opcional, id numérico)"
+            label="EPS (opcional)"
             type="number"
+            hint="Número de identificación de tu EPS, si lo conoces."
             value={form.eps_id}
             onChange={actualizarCampo('eps_id')}
           />
 
           {error && <Alert variant="error">{error}</Alert>}
 
-          <Button type="submit" loading={enviando} className="mt-2 w-full">
+          <Button type="submit" loading={enviando} className="mt-1 w-full">
             Crear cuenta
           </Button>
         </form>
 
-        <p className="mt-4 text-center text-sm text-slate-500">
+        <p className="mt-6 text-center text-base text-ink-soft">
           ¿Ya tienes cuenta?{' '}
-          <Link to="/login" className="font-medium text-brand-700 hover:underline">
+          <Link to="/login" className="font-semibold text-brand-700 hover:underline">
             Inicia sesión
           </Link>
         </p>

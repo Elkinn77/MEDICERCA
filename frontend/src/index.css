@@ -1,22 +1,68 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-50: #ecfdf5;
-  --color-brand-100: #d1fae5;
-  --color-brand-200: #a7f3d0;
-  --color-brand-300: #6ee7b7;
-  --color-brand-400: #34d399;
-  --color-brand-500: #10b981;
-  --color-brand-600: #059669;
-  --color-brand-700: #047857;
-  --color-brand-800: #065f46;
-  --color-brand-900: #064e3b;
+  /* Escala principal "brand": azules, no verdes. Las clases bg-brand-600,
+     text-brand-700, border-brand-300, etc. ya usadas en todo el código
+     heredan esta paleta automáticamente, sin tocar cada archivo. */
+  --color-brand-50: #eaf5fb;
+  --color-brand-100: #d7ecf8;
+  --color-brand-200: #b3dbf1;
+  --color-brand-300: #83c2e7;
+  --color-brand-400: #4fa3d8;
+  --color-brand-500: #2e8bc8;
+  --color-brand-600: #1677b8;
+  --color-brand-700: #135f97;
+  --color-brand-800: #164d78;
+  --color-brand-900: #123b5d;
+
+  /* Navy: para el logo, encabezados fuertes y el pie de página. Un tono más
+     serio que el azul de acción, reservado a acentos puntuales. */
+  --color-navy-600: #2c5478;
+  --color-navy-700: #1c4166;
+  --color-navy-800: #123b5d;
+  --color-navy-900: #0d2c46;
+
+  /* Superficies y texto. El fondo general es un azul casi blanco, no gris
+     puro, para que toda la app se sienta parte de la misma identidad. */
+  --color-surface: #f6fafd;
+  --color-ink: #17324d;
+  --color-ink-soft: #5f7487;
+
+  /* Estados semánticos: verde SOLO para positivo, ámbar SOLO para
+     advertencia, rojo SOLO para error/crítico. Nunca decorativos. */
+  --color-success-50: #eafaf4;
+  --color-success-600: #168a70;
+  --color-success-700: #0f6e59;
+  --color-warning-50: #fff8ec;
+  --color-warning-600: #b3720b;
+  --color-danger-50: #fdedec;
+  --color-danger-600: #c0392f;
+
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 html {
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  /* Base más grande a propósito: con esto, text-base (1rem) queda en 18px y
+     text-sm en ~15.75px en vez de los 16px/14px por defecto de Tailwind —
+     toda la app hereda letras más grandes sin tocar cada clase de texto,
+     pensado para adultos mayores / baja experiencia tecnológica (ver
+     instrucciones de accesibilidad del rediseño). */
+  font-size: 18px;
 }
 
 body {
   min-height: 100vh;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background-color: var(--color-surface);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background-color: var(--color-brand-200);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
 }

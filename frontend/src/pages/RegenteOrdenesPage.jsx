@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Check, ClipboardCheck, ExternalLink, X } from 'lucide-react'
 import { medicamentosApi, ordenesApi } from '../api'
 import { ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
@@ -56,40 +57,47 @@ export default function RegenteOrdenesPage() {
       {cargando ? (
         <CenteredLoader label="Cargando órdenes pendientes…" />
       ) : ordenes.length === 0 ? (
-        <EmptyState title="No hay órdenes pendientes" description="Cuando un paciente cargue una fórmula, aparecerá aquí." />
+        <EmptyState
+          icon={ClipboardCheck}
+          title="No hay órdenes pendientes"
+          description="Cuando un paciente cargue una fórmula, aparecerá aquí."
+        />
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           {ordenes.map((orden) => {
             const medicamento = medicamentosPorId.get(orden.medicamento_id)
             return (
               <Card key={orden.id} className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-slate-900">
+                    <p className="text-lg font-bold text-navy-800">
                       {medicamento ? medicamento.nombre_comercial : `Medicamento #${orden.medicamento_id}`}
                     </p>
                     {medicamento && <Badge color={medicamento.condicion_venta === 'RX' ? 'yellow' : 'green'}>{medicamento.condicion_venta}</Badge>}
                   </div>
-                  <p className="text-sm text-slate-500">Paciente (cédula): {orden.usuario_cedula}</p>
-                  <p className="text-xs text-slate-400">Cargada el {formatearFecha(orden.creado_en)}</p>
+                  <p className="mt-1 text-sm text-ink-soft">Paciente (cédula): {orden.usuario_cedula}</p>
+                  <p className="text-sm text-ink-soft">Cargada el {formatearFecha(orden.creado_en)}</p>
                   <a
                     href={orden.archivo_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs font-medium text-brand-700 hover:underline"
+                    className="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700 hover:underline"
                   >
                     Ver fórmula adjunta
+                    <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                   </a>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-3">
                   <Button
                     variant="secondary"
                     loading={procesando === orden.id}
                     onClick={() => resolver(orden, 'rechazar')}
                   >
+                    <X className="h-5 w-5" aria-hidden="true" />
                     Rechazar
                   </Button>
                   <Button loading={procesando === orden.id} onClick={() => resolver(orden, 'aprobar')}>
+                    <Check className="h-5 w-5" aria-hidden="true" />
                     Aprobar
                   </Button>
                 </div>

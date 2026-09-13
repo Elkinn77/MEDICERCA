@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Pill, Plus, Search, ShieldAlert } from 'lucide-react'
 import { medicamentosApi } from '../api'
 import { ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
@@ -49,9 +50,9 @@ function FormularioNuevoMedicamento({ onCreado }) {
   }
 
   return (
-    <Card className="mb-6 !bg-brand-50">
-      <h2 className="font-semibold text-slate-900">Agregar medicamento al catálogo</h2>
-      <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={enviar}>
+    <Card className="mb-6 !border-brand-100 !bg-brand-50">
+      <h2 className="text-lg font-bold text-navy-800">Agregar medicamento al catálogo</h2>
+      <form className="mt-4 grid gap-5 sm:grid-cols-2" onSubmit={enviar}>
         <Input label="Nombre genérico" required value={form.nombre_generico} onChange={actualizar('nombre_generico')} />
         <Input label="Nombre comercial" required value={form.nombre_comercial} onChange={actualizar('nombre_comercial')} />
         <Input label="Dosis" required value={form.dosis} onChange={actualizar('dosis')} />
@@ -64,8 +65,8 @@ function FormularioNuevoMedicamento({ onCreado }) {
           ))}
         </Select>
         <Input label="Registro sanitario (INVIMA)" required value={form.registro_sanitario} onChange={actualizar('registro_sanitario')} />
-        <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2">
-          <input type="checkbox" checked={form.control_especial} onChange={actualizar('control_especial')} />
+        <label className="flex items-center gap-3 text-base font-medium text-navy-800 sm:col-span-2">
+          <input type="checkbox" className="h-5 w-5 accent-brand-600" checked={form.control_especial} onChange={actualizar('control_especial')} />
           Medicamento de control especial (solo recogida presencial)
         </label>
         {error && (
@@ -126,6 +127,7 @@ export default function CatalogoPage() {
         action={
           esRegente && (
             <Button onClick={() => setMostrarFormulario((v) => !v)}>
+              <Plus className="h-5 w-5" aria-hidden="true" />
               {mostrarFormulario ? 'Cerrar formulario' : 'Agregar medicamento'}
             </Button>
           )
@@ -142,33 +144,44 @@ export default function CatalogoPage() {
         />
       )}
 
-      <div className="mb-6 max-w-sm">
-        <Input placeholder="Buscar por nombre…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+      <div className="relative mb-7 max-w-sm">
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-soft" aria-hidden="true" />
+        <Input
+          placeholder="Buscar por nombre…"
+          className="pl-11"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          aria-label="Buscar medicamento por nombre"
+        />
       </div>
 
       {error && <Alert variant="error">{error}</Alert>}
       {cargando ? (
         <CenteredLoader label="Cargando catálogo…" />
       ) : filtrados.length === 0 ? (
-        <EmptyState title="No hay medicamentos que coincidan" description="Prueba con otro término de búsqueda." />
+        <EmptyState icon={Search} title="No hay medicamentos que coincidan" description="Prueba con otro término de búsqueda." />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {filtrados.map((medicamento) => (
             <Link key={medicamento.id} to={`/catalogo/${medicamento.id}`}>
-              <Card className="h-full transition hover:border-brand-300 hover:shadow-md">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-semibold text-slate-900">{medicamento.nombre_comercial}</h3>
-                  <Badge color={medicamento.condicion_venta === 'RX' ? 'yellow' : 'green'}>
-                    {medicamento.condicion_venta}
-                  </Badge>
+              <Card interactive className="h-full">
+                <div className="mb-3 flex items-start justify-between gap-2">
+                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+                    <Pill className="h-5 w-5" aria-hidden="true" />
+                  </div>
+                  <Badge color={medicamento.condicion_venta === 'RX' ? 'yellow' : 'green'}>{medicamento.condicion_venta}</Badge>
                 </div>
-                <p className="mt-1 text-sm text-slate-500">{medicamento.nombre_generico}</p>
-                <p className="mt-2 text-xs text-slate-400">
+                <h3 className="text-lg font-bold text-navy-800">{medicamento.nombre_comercial}</h3>
+                <p className="mt-0.5 text-base text-ink-soft">{medicamento.nombre_generico}</p>
+                <p className="mt-2 text-sm text-ink-soft">
                   {medicamento.dosis} · {medicamento.presentacion}
                 </p>
                 {medicamento.control_especial && (
                   <div className="mt-3">
-                    <Badge color="red">Control especial</Badge>
+                    <Badge color="red">
+                      <ShieldAlert className="h-4 w-4" aria-hidden="true" />
+                      Control especial
+                    </Badge>
                   </div>
                 )}
               </Card>

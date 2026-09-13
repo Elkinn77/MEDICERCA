@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { FileHeart, Stethoscope } from 'lucide-react'
 import { historiaClinicaApi, medicamentosApi } from '../api'
 import { ApiError } from '../api/client'
 import { formatearFecha, formatearFechaCorta } from '../lib/format'
@@ -40,6 +41,7 @@ export default function HistoriaClinicaPage() {
 
       {sinHistoria ? (
         <EmptyState
+          icon={Stethoscope}
           title="Aún no hay historia clínica"
           description="Tu IPS todavía no ha registrado historia clínica para tu usuario."
         />
@@ -47,25 +49,37 @@ export default function HistoriaClinicaPage() {
         historia && (
           <>
             <Card>
-              <p className="text-sm text-slate-400">{historia.ips_nombre}</p>
-              <h2 className="mt-1 font-semibold text-slate-900">{historia.diagnostico_simulado}</h2>
-              <p className="mt-2 text-xs text-slate-400">Actualizado el {formatearFecha(historia.actualizado_en)}</p>
+              <div className="flex items-start gap-4">
+                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+                  <Stethoscope className="h-6 w-6" aria-hidden="true" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-ink-soft">{historia.ips_nombre}</p>
+                  <h2 className="mt-0.5 text-lg font-bold text-navy-800">{historia.diagnostico_simulado}</h2>
+                  <p className="mt-2 text-sm text-ink-soft">Actualizado el {formatearFecha(historia.actualizado_en)}</p>
+                </div>
+              </div>
             </Card>
 
-            <h3 className="mb-3 mt-6 font-semibold text-slate-900">Prescripciones</h3>
+            <h3 className="mb-4 mt-8 text-xl font-bold text-navy-800">Prescripciones</h3>
             {historia.prescripciones.length === 0 ? (
-              <EmptyState title="Sin prescripciones registradas" />
+              <EmptyState icon={FileHeart} title="Sin prescripciones registradas" />
             ) : (
               <div className="flex flex-col gap-3">
                 {historia.prescripciones.map((prescripcion) => {
                   const medicamento = medicamentosPorId.get(prescripcion.medicamento_id)
                   return (
                     <Card key={prescripcion.id} className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="font-medium text-slate-800">
-                          {medicamento ? medicamento.nombre_comercial : `Medicamento #${prescripcion.medicamento_id}`}
-                        </p>
-                        <p className="text-sm text-slate-500">Formulado el {formatearFechaCorta(prescripcion.fecha_formula)}</p>
+                      <div className="flex items-center gap-4">
+                        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+                          <FileHeart className="h-5 w-5" aria-hidden="true" />
+                        </div>
+                        <div>
+                          <p className="text-base font-bold text-navy-800">
+                            {medicamento ? medicamento.nombre_comercial : `Medicamento #${prescripcion.medicamento_id}`}
+                          </p>
+                          <p className="text-sm text-ink-soft">Formulado el {formatearFechaCorta(prescripcion.fecha_formula)}</p>
+                        </div>
                       </div>
                       <Badge color={prescripcion.vigente ? 'green' : 'slate'}>
                         {prescripcion.vigente ? 'Vigente' : 'No vigente'}
