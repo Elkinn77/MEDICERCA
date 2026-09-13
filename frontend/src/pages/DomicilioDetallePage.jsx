@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ArrowLeft, MapPin } from 'lucide-react'
 import { domiciliosApi } from '../api'
 import { ApiError } from '../api/client'
-import { ESTADO_DOMICILIO_COLOR, ESTADO_DOMICILIO_LABEL, formatearFecha } from '../lib/format'
-import { Alert, Badge, Card, CenteredLoader } from '../components/ui'
+import { ESTADO_DOMICILIO, formatearFecha } from '../lib/format'
+import { Alert, Card, CenteredLoader, EstadoBadge } from '../components/ui'
 
 export default function DomicilioDetallePage() {
   const { ipsId, domicilioId } = useParams()
@@ -30,35 +31,37 @@ export default function DomicilioDetallePage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <Link to="/domicilios" className="text-sm font-medium text-brand-700 hover:underline">
-        ← Volver a mis domicilios
+      <Link to="/domicilios" className="flex w-fit items-center gap-1.5 text-base font-semibold text-brand-700 hover:underline">
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        Volver a mis domicilios
       </Link>
 
       <Card className="mt-4">
         <div className="flex items-center justify-between gap-3">
-          <h1 className="text-xl font-bold text-slate-900">Domicilio #{domicilio.id}</h1>
-          <Badge color={ESTADO_DOMICILIO_COLOR[domicilio.estado]}>{ESTADO_DOMICILIO_LABEL[domicilio.estado]}</Badge>
+          <h1 className="text-xl font-extrabold text-navy-800">Domicilio #{domicilio.id}</h1>
+          <EstadoBadge config={ESTADO_DOMICILIO[domicilio.estado]} />
         </div>
-        <p className="mt-1 text-sm text-slate-500">Orden médica asociada #{domicilio.orden_id}</p>
+        <p className="mt-1 text-base text-ink-soft">Orden médica asociada #{domicilio.orden_id}</p>
         {domicilio.lat_actual != null && (
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-3 flex items-center gap-1.5 text-base text-navy-800">
+            <MapPin className="h-5 w-5 text-brand-600" aria-hidden="true" />
             Última posición conocida: {domicilio.lat_actual}, {domicilio.lng_actual}
           </p>
         )}
       </Card>
 
       <Card className="mt-6">
-        <h2 className="font-semibold text-slate-900">Línea de tiempo</h2>
-        <ol className="mt-4 flex flex-col gap-4 border-l-2 border-brand-200 pl-4">
+        <h2 className="text-lg font-bold text-navy-800">Línea de tiempo</h2>
+        <ol className="mt-5 flex flex-col gap-5 border-l-2 border-brand-200 pl-5">
           {historial.map((paso, indice) => (
             <li key={indice} className="relative">
-              <span className="absolute -left-[1.4rem] top-1 h-3 w-3 rounded-full bg-brand-500" />
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge color={ESTADO_DOMICILIO_COLOR[paso.estado]}>{ESTADO_DOMICILIO_LABEL[paso.estado]}</Badge>
-                <span className="text-sm text-slate-500">{formatearFecha(paso.registrado_en)}</span>
+              <span className="absolute -left-[1.65rem] top-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-brand-500" />
+              <div className="flex flex-wrap items-center gap-2.5">
+                <EstadoBadge config={ESTADO_DOMICILIO[paso.estado]} />
+                <span className="text-sm font-medium text-ink-soft">{formatearFecha(paso.registrado_en)}</span>
               </div>
               {paso.lat_actual != null && (
-                <p className="mt-1 text-xs text-slate-400">
+                <p className="mt-1.5 text-sm text-ink-soft">
                   Posición: {paso.lat_actual}, {paso.lng_actual}
                 </p>
               )}

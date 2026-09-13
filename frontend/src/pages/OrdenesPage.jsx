@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { FileText, Link2, Plus, Truck } from 'lucide-react'
 import { medicamentosApi, ordenesApi } from '../api'
 import { ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { ESTADO_ORDEN_COLOR, ESTADO_ORDEN_LABEL, formatearFecha } from '../lib/format'
-import { Alert, Badge, Button, Card, CenteredLoader, EmptyState, Input, PageHeader, Select } from '../components/ui'
+import { ESTADO_ORDEN, formatearFecha } from '../lib/format'
+import { Alert, Button, Card, CenteredLoader, EmptyState, EstadoBadge, Input, PageHeader, Select } from '../components/ui'
 
 function FormularioNuevaOrden({ usuario, medicamentos, medicamentoIdInicial, onCreada }) {
   const [medicamentoId, setMedicamentoId] = useState(medicamentoIdInicial ? String(medicamentoIdInicial) : '')
@@ -37,13 +38,13 @@ function FormularioNuevaOrden({ usuario, medicamentos, medicamentoIdInicial, onC
   }
 
   return (
-    <Card className="mb-6 !bg-brand-50">
-      <h2 className="font-semibold text-slate-900">Cargar nueva orden médica</h2>
-      <p className="mt-1 text-sm text-slate-500">
+    <Card className="mb-6 !border-brand-100 !bg-brand-50">
+      <h2 className="text-lg font-bold text-navy-800">Cargar nueva orden médica</h2>
+      <p className="mt-1 text-base text-ink-soft">
         Sube el enlace a tu fórmula médica escaneada. Un regente de tu IPS la revisará.
       </p>
-      <form className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:flex-wrap" onSubmit={enviar}>
-        <div className="min-w-[14rem] flex-1">
+      <form className="mt-5 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end" onSubmit={enviar}>
+        <div className="min-w-56 flex-1">
           <Select label="Medicamento" required value={medicamentoId} onChange={(e) => setMedicamentoId(e.target.value)}>
             <option value="">Selecciona un medicamento…</option>
             {medicamentos.map((m) => (
@@ -53,7 +54,7 @@ function FormularioNuevaOrden({ usuario, medicamentos, medicamentoIdInicial, onC
             ))}
           </Select>
         </div>
-        <div className="min-w-[14rem] flex-1">
+        <div className="min-w-56 flex-1">
           <Input
             label="Enlace a la fórmula (URL)"
             type="url"
@@ -68,7 +69,7 @@ function FormularioNuevaOrden({ usuario, medicamentos, medicamentoIdInicial, onC
         </Button>
       </form>
       {error && (
-        <div className="mt-3">
+        <div className="mt-4">
           <Alert variant="error">{error}</Alert>
         </div>
       )}
@@ -109,10 +110,12 @@ export default function OrdenesPage() {
   return (
     <div>
       <PageHeader
+        icon={FileText}
         title="Mis órdenes médicas"
         description="Fórmulas que has cargado y su estado de revisión."
         action={
           <Button onClick={() => setMostrarFormulario((v) => !v)}>
+            <Plus className="h-5 w-5" aria-hidden="true" />
             {mostrarFormulario ? 'Cerrar formulario' : 'Cargar orden'}
           </Button>
         }
@@ -136,24 +139,30 @@ export default function OrdenesPage() {
         <CenteredLoader label="Cargando tus órdenes…" />
       ) : ordenes.length === 0 ? (
         <EmptyState
+          icon={FileText}
           title="Todavía no has cargado ninguna orden"
           description="Cuando tengas una fórmula médica, cárgala aquí para poder pedir tu medicamento a domicilio."
         />
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           {ordenes.map((orden) => {
             const medicamento = medicamentosPorId.get(orden.medicamento_id)
             return (
               <Card key={orden.id} className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <p className="font-medium text-slate-900">
-                    {medicamento ? medicamento.nombre_comercial : `Medicamento #${orden.medicamento_id}`}
-                  </p>
-                  <p className="text-sm text-slate-500">Cargada el {formatearFecha(orden.creado_en)}</p>
-                  {orden.revisado_por && <p className="text-xs text-slate-400">Revisada por {orden.revisado_por}</p>}
+                <div className="flex items-center gap-4">
+                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-navy-700 text-white shadow-[0_10px_20px_-10px_rgba(18,59,93,0.5)]">
+                    <FileText className="h-6 w-6" aria-hidden="true" />
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold text-navy-800">
+                      {medicamento ? medicamento.nombre_comercial : `Medicamento #${orden.medicamento_id}`}
+                    </p>
+                    <p className="text-sm text-ink-soft">Cargada el {formatearFecha(orden.creado_en)}</p>
+                    {orden.revisado_por && <p className="text-sm text-ink-soft">Revisada por {orden.revisado_por}</p>}
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Badge color={ESTADO_ORDEN_COLOR[orden.estado]}>{ESTADO_ORDEN_LABEL[orden.estado]}</Badge>
+                <div className="flex flex-wrap items-center gap-3">
+                  <EstadoBadge config={ESTADO_ORDEN[orden.estado]} />
                   {orden.estado === 'aprobada' && !medicamento?.control_especial && (
                     <Button
                       variant="secondary"
@@ -163,13 +172,15 @@ export default function OrdenesPage() {
                         })
                       }
                     >
+                      <Truck className="h-5 w-5" aria-hidden="true" />
                       Pedir a domicilio
                     </Button>
                   )}
                   <Link
                     to={`/ordenes/${usuario.ips_id}/${orden.id}`}
-                    className="text-sm font-medium text-brand-700 hover:underline"
+                    className="flex items-center gap-1.5 text-base font-semibold text-brand-700 hover:underline"
                   >
+                    <Link2 className="h-4 w-4" aria-hidden="true" />
                     Ver detalle
                   </Link>
                 </div>
