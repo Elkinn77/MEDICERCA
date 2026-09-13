@@ -36,7 +36,7 @@ function FilaDomicilio({ domicilio, ipsId, onActualizado }) {
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-navy-700 text-white shadow-[0_10px_20px_-10px_rgba(18,59,93,0.5)]">
             <Truck className="h-5 w-5" aria-hidden="true" />
           </div>
           <div>
@@ -119,7 +119,7 @@ export default function RegenteDomiciliosPage() {
 
   return (
     <div>
-      <PageHeader title="Domicilios activos" description="Pedidos sin entregar en tu IPS. Actualiza su estado logístico aquí." />
+      <PageHeader icon={Truck} title="Domicilios activos" description="Pedidos sin entregar en tu IPS. Actualiza su estado logístico aquí." />
 
       {error && <Alert variant="error">{error}</Alert>}
 

@@ -99,12 +99,13 @@ export default function CrearDomicilioPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
+        icon={Truck}
         title="Pedir a domicilio"
         description={`Orden #${orden.id} — ${medicamento ? medicamento.nombre_comercial : `Medicamento #${orden.medicamento_id}`}`}
       />
 
       <Card>
-        <div className="mb-1 grid h-12 w-12 place-items-center rounded-xl bg-brand-50 text-brand-700">
+        <div className="mb-1 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-navy-700 text-white shadow-[0_10px_20px_-10px_rgba(18,59,93,0.5)]">
           <MapPin className="h-6 w-6" aria-hidden="true" />
         </div>
         <h2 className="text-lg font-bold text-navy-800">1. Elige el punto de venta de origen</h2>

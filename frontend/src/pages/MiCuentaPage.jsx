@@ -25,7 +25,7 @@ export default function MiCuentaPage() {
 
       <Card>
         <div className="flex items-center gap-4">
-          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-brand-100 text-2xl font-extrabold text-brand-800">
+          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-500 to-navy-700 text-2xl font-extrabold text-white shadow-[0_10px_20px_-10px_rgba(18,59,93,0.5)]">
             {usuario.nombre.charAt(0).toUpperCase()}
           </span>
           <div>

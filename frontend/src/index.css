@@ -66,3 +66,43 @@ body {
   outline: 2px solid var(--color-brand-500);
   outline-offset: 2px;
 }
+
+/* --- Acentos "premium" (hero, tarjetas destacadas, marcos de auth) ---
+   Uso deliberadamente acotado: el contenido operativo (formularios, listas,
+   estados) se queda simple y de alto contraste a propósito, por
+   accesibilidad para adultos mayores — el brillo va solo en los puntos de
+   mayor impacto visual, nunca en texto que hay que leer con cuidado. */
+
+.text-gradient-brand {
+  background-image: linear-gradient(90deg, #eaf5fb 0%, #bfe0f5 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Vidrio "claro": para usar SOBRE fondos claros (p.ej. detrás de la tarjeta
+   de login, con los blobs de color de fondo). Con texto oscuro encima. */
+.glass-panel {
+  background-color: rgb(255 255 255 / 70%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgb(255 255 255 / 60%);
+}
+
+/* Vidrio "oscuro": para usar SOBRE fondos oscuros/de color (el hero navy).
+   Muy poco blanco (10%) a propósito: que el fondo oscuro siga dominando
+   para que el texto blanco encima mantenga contraste alto. NUNCA usar
+   glass-panel (el claro) con texto blanco — ahí el fondo se vuelve claro y
+   el texto blanco deja de leerse. */
+.glass-panel-dark {
+  background-color: rgb(255 255 255 / 12%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgb(255 255 255 / 25%);
+}
+
+.glow-ring {
+  box-shadow:
+    0 0 0 1px rgb(22 119 184 / 8%),
+    0 20px 40px -16px rgb(18 59 93 / 25%);
+}

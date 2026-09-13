@@ -110,6 +110,7 @@ export default function OrdenesPage() {
   return (
     <div>
       <PageHeader
+        icon={FileText}
         title="Mis órdenes médicas"
         description="Fórmulas que has cargado y su estado de revisión."
         action={
@@ -149,7 +150,7 @@ export default function OrdenesPage() {
             return (
               <Card key={orden.id} className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-navy-700 text-white shadow-[0_10px_20px_-10px_rgba(18,59,93,0.5)]">
                     <FileText className="h-6 w-6" aria-hidden="true" />
                   </div>
                   <div>

@@ -23,7 +23,7 @@ export default function DomiciliosPage() {
 
   return (
     <div>
-      <PageHeader title="Mis domicilios" description="Seguimiento de tus pedidos a domicilio." />
+      <PageHeader icon={Truck} title="Mis domicilios" description="Seguimiento de tus pedidos a domicilio." />
 
       {error && <Alert variant="error">{error}</Alert>}
 
@@ -42,7 +42,7 @@ export default function DomiciliosPage() {
               <Card interactive className="h-full">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-navy-700 text-white shadow-[0_10px_20px_-10px_rgba(18,59,93,0.5)]">
                       <Truck className="h-5 w-5" aria-hidden="true" />
                     </div>
                     <p className="text-lg font-bold text-navy-800">Domicilio #{domicilio.id}</p>

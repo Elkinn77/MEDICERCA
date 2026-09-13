@@ -49,7 +49,7 @@ export default function Navbar() {
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <div className="flex items-center gap-6">
           <NavLink to="/" className="flex items-center gap-2.5 text-xl font-extrabold text-navy-800">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-navy-800 text-white">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-navy-800 text-white shadow-[0_6px_14px_-6px_rgba(18,59,93,0.6)]">
               <Pill className="h-5 w-5" aria-hidden="true" />
             </span>
             MediCerca
@@ -71,7 +71,7 @@ export default function Navbar() {
                 to="/mi-cuenta"
                 className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-base text-ink-soft hover:bg-slate-100 hover:text-navy-800"
               >
-                <span className="grid h-9 w-9 place-items-center rounded-full bg-brand-100 text-sm font-bold text-brand-800">
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-brand-500 to-navy-700 text-sm font-bold text-white shadow-[0_4px_10px_-4px_rgba(18,59,93,0.5)]">
                   {usuario.nombre?.charAt(0)?.toUpperCase() || <User className="h-4 w-4" aria-hidden="true" />}
                 </span>
                 <span className="font-semibold text-navy-800">

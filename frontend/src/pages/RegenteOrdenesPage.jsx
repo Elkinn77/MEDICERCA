@@ -50,7 +50,7 @@ export default function RegenteOrdenesPage() {
 
   return (
     <div>
-      <PageHeader title="Órdenes por aprobar" description="Fórmulas médicas pendientes de revisión en tu IPS." />
+      <PageHeader icon={ClipboardCheck} title="Órdenes por aprobar" description="Fórmulas médicas pendientes de revisión en tu IPS." />
 
       {error && <Alert variant="error">{error}</Alert>}
 

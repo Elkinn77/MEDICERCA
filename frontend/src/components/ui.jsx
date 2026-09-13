@@ -4,7 +4,9 @@ export function Card({ children, className = '', interactive = false }) {
   return (
     <div
       className={`rounded-2xl border border-slate-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(18,59,93,0.04),0_8px_24px_-12px_rgba(18,59,93,0.12)] sm:p-7 ${
-        interactive ? 'transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-[0_2px_4px_rgba(18,59,93,0.06),0_16px_32px_-16px_rgba(18,59,93,0.2)]' : ''
+        interactive
+          ? 'transition duration-200 hover:-translate-y-1 hover:border-brand-200 hover:shadow-[0_4px_10px_rgba(22,119,184,0.08),0_24px_48px_-20px_rgba(18,59,93,0.28)]'
+          : ''
       } ${className}`}
     >
       {children}
@@ -13,10 +15,11 @@ export function Card({ children, className = '', interactive = false }) {
 }
 
 const BUTTON_BASE =
-  'inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 py-3 text-base font-semibold leading-none transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100'
+  'inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 py-3 text-base font-semibold leading-none transition-all duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100'
 
 const BUTTON_VARIANTS = {
-  primary: 'bg-brand-600 text-white shadow-sm hover:bg-brand-700 focus-visible:outline-brand-600',
+  primary:
+    'bg-gradient-to-b from-brand-500 to-brand-700 text-white shadow-[0_1px_1px_rgba(255,255,255,0.15)_inset,0_10px_24px_-8px_rgba(22,119,184,0.55)] hover:shadow-[0_1px_1px_rgba(255,255,255,0.15)_inset,0_16px_32px_-8px_rgba(22,119,184,0.65)] hover:-translate-y-0.5 focus-visible:outline-brand-600',
   secondary: 'bg-white text-navy-800 border-2 border-slate-200 hover:border-brand-300 hover:bg-brand-50',
   outline: 'bg-transparent text-brand-700 border-2 border-brand-600 hover:bg-brand-50',
   destructive: 'bg-danger-600 text-white shadow-sm hover:bg-red-800',
@@ -153,7 +156,7 @@ export function Spinner({ small = false, className = '' }) {
 export function EmptyState({ title, description, action, icon: Icono = Inbox }) {
   return (
     <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white px-6 py-14 text-center">
-      <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-brand-50 text-brand-600">
+      <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-700 text-white shadow-[0_10px_20px_-10px_rgba(22,119,184,0.6)]">
         <Icono className="h-7 w-7" aria-hidden="true" />
       </div>
       <p className="text-lg font-semibold text-navy-800">{title}</p>
@@ -163,12 +166,31 @@ export function EmptyState({ title, description, action, icon: Icono = Inbox }) 
   )
 }
 
-export function PageHeader({ title, description, action }) {
+/** Insignia de icono en gradiente: el único acento "premium" reutilizado en
+ * encabezados, tarjetas destacadas y estados vacíos. Deliberadamente NO se
+ * usa dentro de listas de datos reales (ordenes, domicilios) para no restar
+ * contraste donde el usuario tiene que leer con cuidado. */
+export function IconBadge({ icon: Icono, size = 'md', className = '' }) {
+  const dimensiones = size === 'lg' ? 'h-16 w-16' : 'h-14 w-14'
+  const iconoTam = size === 'lg' ? 'h-8 w-8' : 'h-7 w-7'
   return (
-    <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-navy-800 sm:text-4xl">{title}</h1>
-        {description && <p className="mt-2 max-w-2xl text-lg text-ink-soft">{description}</p>}
+    <div
+      className={`grid shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-navy-700 text-white shadow-[0_12px_24px_-10px_rgba(18,59,93,0.55)] ${dimensiones} ${className}`}
+    >
+      <Icono className={iconoTam} aria-hidden="true" />
+    </div>
+  )
+}
+
+export function PageHeader({ title, description, action, icon }) {
+  return (
+    <div className="mb-9 flex flex-wrap items-start justify-between gap-5">
+      <div className="flex items-start gap-4">
+        {icon && <IconBadge icon={icon} />}
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-navy-800 sm:text-4xl">{title}</h1>
+          {description && <p className="mt-2 max-w-2xl text-lg text-ink-soft">{description}</p>}
+        </div>
       </div>
       {action}
     </div>

@@ -4,6 +4,7 @@ import { UserPlus } from 'lucide-react'
 import { authApi, ipsApi } from '../api'
 import { ApiError } from '../api/client'
 import { Alert, Button, Card, Input, Select } from '../components/ui'
+import DecorativeBackdrop from '../components/DecorativeBackdrop'
 
 const FORM_INICIAL = { nombre: '', cedula: '', correo: '', password: '', ips_id: '', eps_id: '' }
 
@@ -46,9 +47,10 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="mx-auto max-w-md">
-      <Card>
-        <div className="mb-2 grid h-12 w-12 place-items-center rounded-xl bg-brand-50 text-brand-700">
+    <div className="relative mx-auto max-w-md py-6">
+      <DecorativeBackdrop variant="auth" />
+      <Card className="relative">
+        <div className="mb-2 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-navy-700 text-white shadow-[0_10px_20px_-10px_rgba(18,59,93,0.5)]">
           <UserPlus className="h-6 w-6" aria-hidden="true" />
         </div>
         <h1 className="text-2xl font-extrabold text-navy-800">Crea tu cuenta</h1>

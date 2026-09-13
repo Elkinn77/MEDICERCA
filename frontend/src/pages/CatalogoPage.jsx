@@ -122,6 +122,7 @@ export default function CatalogoPage() {
   return (
     <div>
       <PageHeader
+        icon={Pill}
         title="Catálogo de medicamentos"
         description={`${total} medicamento(s) registrados en el catálogo central.`}
         action={
@@ -166,7 +167,7 @@ export default function CatalogoPage() {
             <Link key={medicamento.id} to={`/catalogo/${medicamento.id}`}>
               <Card interactive className="h-full">
                 <div className="mb-3 flex items-start justify-between gap-2">
-                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-700 text-white shadow-[0_8px_16px_-8px_rgba(22,119,184,0.55)]">
                     <Pill className="h-5 w-5" aria-hidden="true" />
                   </div>
                   <Badge color={medicamento.condicion_venta === 'RX' ? 'yellow' : 'green'}>{medicamento.condicion_venta}</Badge>
