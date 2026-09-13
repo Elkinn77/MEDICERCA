@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ArrowLeft, Beaker, FileText, Layers, LocateFixed, MapPin, Search, ShieldAlert } from 'lucide-react'
 import { disponibilidadApi, medicamentosApi } from '../api'
 import { ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { NIVEL_DISPONIBILIDAD_COLOR, NIVEL_DISPONIBILIDAD_LABEL } from '../lib/format'
-import { Alert, Badge, Button, Card, CenteredLoader, EmptyState, Input } from '../components/ui'
+import { NIVEL_DISPONIBILIDAD } from '../lib/format'
+import { Alert, Badge, Button, Card, CenteredLoader, EmptyState, EstadoBadge, Input } from '../components/ui'
 
 function useGeolocalizacion() {
   const [ubicacion, setUbicacion] = useState(null)
@@ -31,7 +32,7 @@ function useGeolocalizacion() {
     )
   }
 
-  return { ubicacion, setUbicacion, error, buscando, solicitar }
+  return { ubicacion, error, buscando, solicitar }
 }
 
 export default function MedicamentoDetallePage() {
@@ -86,49 +87,64 @@ export default function MedicamentoDetallePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link to="/catalogo" className="text-sm font-medium text-brand-700 hover:underline">
-        ← Volver al catálogo
+      <Link to="/catalogo" className="flex w-fit items-center gap-1.5 text-base font-semibold text-brand-700 hover:underline">
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        Volver al catálogo
       </Link>
 
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">{medicamento.nombre_comercial}</h1>
-            <p className="text-sm text-slate-500">{medicamento.nombre_generico}</p>
+            <h1 className="text-2xl font-extrabold text-navy-800">{medicamento.nombre_comercial}</h1>
+            <p className="text-base text-ink-soft">{medicamento.nombre_generico}</p>
           </div>
           <div className="flex gap-2">
             <Badge color={medicamento.condicion_venta === 'RX' ? 'yellow' : 'green'}>{medicamento.condicion_venta}</Badge>
-            {medicamento.control_especial && <Badge color="red">Control especial</Badge>}
+            {medicamento.control_especial && (
+              <Badge color="red">
+                <ShieldAlert className="h-4 w-4" aria-hidden="true" />
+                Control especial
+              </Badge>
+            )}
           </div>
         </div>
-        <dl className="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+        <dl className="mt-6 grid grid-cols-2 gap-5 text-base sm:grid-cols-4">
           <div>
-            <dt className="text-slate-400">Dosis</dt>
-            <dd className="font-medium text-slate-800">{medicamento.dosis}</dd>
+            <dt className="flex items-center gap-1.5 text-sm font-semibold text-ink-soft">
+              <Beaker className="h-4 w-4" aria-hidden="true" /> Dosis
+            </dt>
+            <dd className="mt-1 font-semibold text-navy-800">{medicamento.dosis}</dd>
           </div>
           <div>
-            <dt className="text-slate-400">Presentación</dt>
-            <dd className="font-medium text-slate-800">{medicamento.presentacion}</dd>
+            <dt className="flex items-center gap-1.5 text-sm font-semibold text-ink-soft">
+              <Layers className="h-4 w-4" aria-hidden="true" /> Presentación
+            </dt>
+            <dd className="mt-1 font-semibold text-navy-800">{medicamento.presentacion}</dd>
           </div>
           <div className="col-span-2">
-            <dt className="text-slate-400">Registro sanitario</dt>
-            <dd className="font-medium text-slate-800">{medicamento.registro_sanitario}</dd>
+            <dt className="flex items-center gap-1.5 text-sm font-semibold text-ink-soft">
+              <FileText className="h-4 w-4" aria-hidden="true" /> Registro sanitario
+            </dt>
+            <dd className="mt-1 font-semibold text-navy-800">{medicamento.registro_sanitario}</dd>
           </div>
         </dl>
 
         {medicamento.condicion_venta === 'RX' && (
-          <Alert variant="warning">
-            Este medicamento requiere fórmula médica aprobada por tu IPS antes de poder pedirlo a domicilio.
-            {medicamento.control_especial && ' Al ser de control especial, solo se entrega por recogida presencial.'}
-          </Alert>
+          <div className="mt-5">
+            <Alert variant="warning">
+              Este medicamento requiere fórmula médica aprobada por tu IPS antes de poder pedirlo a domicilio.
+              {medicamento.control_especial && ' Al ser de control especial, solo se entrega por recogida presencial.'}
+            </Alert>
+          </div>
         )}
 
         {autenticado && !medicamento.control_especial && (
-          <div className="mt-4">
+          <div className="mt-5">
             <Button
               variant="secondary"
               onClick={() => navigate('/ordenes', { state: { medicamentoId: medicamento.id } })}
             >
+              <FileText className="h-5 w-5" aria-hidden="true" />
               Cargar orden médica para este medicamento
             </Button>
           </div>
@@ -136,56 +152,67 @@ export default function MedicamentoDetallePage() {
       </Card>
 
       <Card>
-        <h2 className="font-semibold text-slate-900">Consultar disponibilidad cercana</h2>
-        <p className="mt-1 text-sm text-slate-500">
+        <div className="mb-1 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-navy-700 text-white shadow-[0_10px_20px_-10px_rgba(18,59,93,0.5)]">
+          <MapPin className="h-6 w-6" aria-hidden="true" />
+        </div>
+        <h2 className="text-lg font-bold text-navy-800">Consultar disponibilidad cercana</h2>
+        <p className="mt-1 text-base text-ink-soft">
           Comparte tu ubicación para ver en qué puntos de venta hay inventario, ordenados por cercanía.
         </p>
 
-        <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={consultarDisponibilidad}>
-          <div className="flex-1 min-w-[10rem]">
+        <form className="mt-5 flex flex-wrap items-end gap-3" onSubmit={consultarDisponibilidad}>
+          <div className="min-w-48 flex-1">
             <Input label="Tu ciudad" value={ciudad} onChange={(e) => setCiudad(e.target.value)} required />
           </div>
           <Button type="button" variant="secondary" onClick={solicitar} loading={buscando}>
+            <LocateFixed className="h-5 w-5" aria-hidden="true" />
             {ubicacion ? 'Actualizar ubicación' : 'Usar mi ubicación'}
           </Button>
           <Button type="submit" loading={consultando}>
+            <Search className="h-5 w-5" aria-hidden="true" />
             Buscar disponibilidad
           </Button>
         </form>
 
         {ubicacion && (
-          <p className="mt-2 text-xs text-slate-400">
+          <p className="mt-3 text-sm text-ink-soft">
             Ubicación: {ubicacion.lat.toFixed(4)}, {ubicacion.lng.toFixed(4)}
           </p>
         )}
-        {errorUbicacion && <Alert variant="warning">{errorUbicacion}</Alert>}
-        {errorDisponibilidad && <Alert variant="error">{errorDisponibilidad}</Alert>}
+        {errorUbicacion && (
+          <div className="mt-3">
+            <Alert variant="warning">{errorUbicacion}</Alert>
+          </div>
+        )}
+        {errorDisponibilidad && (
+          <div className="mt-3">
+            <Alert variant="error">{errorDisponibilidad}</Alert>
+          </div>
+        )}
 
         {resultados && (
-          <div className="mt-6">
+          <div className="mt-7">
             {resultados.length === 0 ? (
-              <EmptyState title="Sin resultados" description="No encontramos inventario para este medicamento." />
+              <EmptyState icon={MapPin} title="Sin resultados" description="No encontramos inventario para este medicamento." />
             ) : (
               <ul className="flex flex-col gap-3">
                 {resultados.map((resultado, indice) => (
                   <li
                     key={`${resultado.ips_id}-${resultado.punto_id}-${indice}`}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4"
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-slate-100 p-4"
                   >
                     <div>
-                      <p className="font-medium text-slate-800">{resultado.punto_nombre}</p>
-                      <p className="text-sm text-slate-500">
+                      <p className="text-base font-bold text-navy-800">{resultado.punto_nombre}</p>
+                      <p className="text-sm text-ink-soft">
                         {resultado.ciudad} · {resultado.ips_nombre}
                       </p>
                       {resultado.fecha_reabastecimiento && (
-                        <p className="text-xs text-slate-400">Reabastece: {resultado.fecha_reabastecimiento}</p>
+                        <p className="mt-0.5 text-sm text-ink-soft">Reabastece: {resultado.fecha_reabastecimiento}</p>
                       )}
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-sm text-slate-600">Cantidad: {resultado.cantidad}</span>
-                      <Badge color={NIVEL_DISPONIBILIDAD_COLOR[resultado.nivel] || 'slate'}>
-                        {NIVEL_DISPONIBILIDAD_LABEL[resultado.nivel] || resultado.nivel}
-                      </Badge>
+                      <span className="text-sm font-semibold text-ink-soft">Cantidad: {resultado.cantidad}</span>
+                      <EstadoBadge config={NIVEL_DISPONIBILIDAD[resultado.nivel]} />
                     </div>
                   </li>
                 ))}
