@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { LocateFixed, MapPin, Package, Search, Truck } from 'lucide-react'
 import { disponibilidadApi, domiciliosApi } from '../api'
 import { ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
@@ -99,30 +98,24 @@ export default function CrearDomicilioPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
-        icon={Truck}
         title="Pedir a domicilio"
         description={`Orden #${orden.id} — ${medicamento ? medicamento.nombre_comercial : `Medicamento #${orden.medicamento_id}`}`}
       />
 
       <Card>
-        <div className="mb-1 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-navy-700 text-white shadow-[0_10px_20px_-10px_rgba(18,59,93,0.5)]">
-          <MapPin className="h-6 w-6" aria-hidden="true" />
-        </div>
-        <h2 className="text-lg font-bold text-navy-800">1. Elige el punto de venta de origen</h2>
-        <p className="mt-1 text-base text-ink-soft">
+        <h2 className="font-semibold text-slate-900">1. Elige el punto de venta de origen</h2>
+        <p className="mt-1 text-sm text-slate-500">
           Solo se muestran puntos de tu propia IPS con inventario disponible.
         </p>
 
-        <form className="mt-5 flex flex-wrap items-end gap-3" onSubmit={buscarPuntos}>
-          <div className="min-w-48 flex-1">
+        <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={buscarPuntos}>
+          <div className="min-w-[10rem] flex-1">
             <Input label="Tu ciudad" value={ciudad} onChange={(e) => setCiudad(e.target.value)} required />
           </div>
           <Button type="button" variant="secondary" onClick={solicitarUbicacion} loading={buscandoUbicacion}>
-            <LocateFixed className="h-5 w-5" aria-hidden="true" />
             {ubicacion ? 'Actualizar ubicación' : 'Usar mi ubicación'}
           </Button>
           <Button type="submit" loading={consultando}>
-            <Search className="h-5 w-5" aria-hidden="true" />
             Buscar puntos
           </Button>
         </form>
@@ -134,10 +127,9 @@ export default function CrearDomicilioPage() {
         )}
 
         {puntosElegibles && (
-          <div className="mt-7">
+          <div className="mt-6">
             {puntosElegibles.length === 0 ? (
               <EmptyState
-                icon={Package}
                 title="No hay puntos de tu IPS con inventario"
                 description="Prueba de nuevo más tarde o consulta disponibilidad en otras IPS desde el catálogo."
               />
@@ -146,7 +138,7 @@ export default function CrearDomicilioPage() {
                 {puntosElegibles.map((punto) => (
                   <label
                     key={punto.punto_id}
-                    className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border-2 p-4 transition ${
+                    className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border p-4 transition ${
                       puntoSeleccionado === punto.punto_id ? 'border-brand-500 bg-brand-50' : 'border-slate-200'
                     }`}
                   >
@@ -154,20 +146,18 @@ export default function CrearDomicilioPage() {
                       <input
                         type="radio"
                         name="punto"
-                        className="h-5 w-5 accent-brand-600"
                         checked={puntoSeleccionado === punto.punto_id}
                         onChange={() => setPuntoSeleccionado(punto.punto_id)}
                       />
                       <div>
-                        <p className="text-base font-bold text-navy-800">{punto.punto_nombre}</p>
-                        <p className="text-sm text-ink-soft">{punto.ciudad}</p>
+                        <p className="font-medium text-slate-800">{punto.punto_nombre}</p>
+                        <p className="text-sm text-slate-500">{punto.ciudad}</p>
                       </div>
                     </div>
-                    <span className="text-sm font-semibold text-ink-soft">Stock: {punto.cantidad}</span>
+                    <span className="text-sm text-slate-600">Stock: {punto.cantidad}</span>
                   </label>
                 ))}
                 <Button onClick={confirmarDomicilio} loading={confirmando} className="mt-2 self-start">
-                  <Truck className="h-5 w-5" aria-hidden="true" />
                   Confirmar domicilio
                 </Button>
               </div>

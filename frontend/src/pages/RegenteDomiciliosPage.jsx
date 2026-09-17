@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { RefreshCw, Truck } from 'lucide-react'
 import { domiciliosApi } from '../api'
 import { ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { ESTADO_DOMICILIO } from '../lib/format'
-import { Alert, Button, Card, CenteredLoader, EmptyState, EstadoBadge, PageHeader, Select } from '../components/ui'
+import { ESTADO_DOMICILIO_COLOR, ESTADO_DOMICILIO_LABEL } from '../lib/format'
+import { Alert, Badge, Button, Card, CenteredLoader, EmptyState, PageHeader, Select } from '../components/ui'
 
 const ESTADOS = ['confirmado', 'en_alistamiento', 'en_camino', 'entregado']
 
@@ -35,59 +34,47 @@ function FilaDomicilio({ domicilio, ipsId, onActualizado }) {
   return (
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-navy-700 text-white shadow-[0_10px_20px_-10px_rgba(18,59,93,0.5)]">
-            <Truck className="h-5 w-5" aria-hidden="true" />
-          </div>
-          <div>
-            <Link to={`/domicilios/${ipsId}/${domicilio.id}`} className="text-lg font-bold text-navy-800 hover:underline">
-              Domicilio #{domicilio.id}
-            </Link>
-            <p className="text-sm text-ink-soft">Orden médica #{domicilio.orden_id}</p>
-          </div>
+        <div>
+          <Link to={`/domicilios/${ipsId}/${domicilio.id}`} className="font-medium text-slate-900 hover:underline">
+            Domicilio #{domicilio.id}
+          </Link>
+          <p className="text-sm text-slate-500">Orden médica #{domicilio.orden_id}</p>
         </div>
-        <EstadoBadge config={ESTADO_DOMICILIO[domicilio.estado]} />
+        <Badge color={ESTADO_DOMICILIO_COLOR[domicilio.estado]}>{ESTADO_DOMICILIO_LABEL[domicilio.estado]}</Badge>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-end gap-3">
-        <div className="min-w-44">
+      <div className="mt-4 flex flex-wrap items-end gap-3">
+        <div className="min-w-[10rem]">
           <Select label="Nuevo estado" value={nuevoEstado} onChange={(e) => setNuevoEstado(e.target.value)}>
             {ESTADOS.map((estado) => (
               <option key={estado} value={estado}>
-                {ESTADO_DOMICILIO[estado].etiqueta}
+                {ESTADO_DOMICILIO_LABEL[estado]}
               </option>
             ))}
           </Select>
         </div>
-        <div className="w-32">
-          <label className="block text-sm" htmlFor={`lat-${domicilio.id}`}>
-            <span className="mb-1.5 block font-semibold text-navy-800">Lat (opc.)</span>
-            <input
-              id={`lat-${domicilio.id}`}
-              className="min-h-12 w-full rounded-xl border-2 border-slate-200 px-3 py-3 text-base shadow-sm outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100"
-              value={lat}
-              onChange={(e) => setLat(e.target.value)}
-            />
-          </label>
+        <div className="w-28">
+          <input
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+            placeholder="Lat (opcional)"
+            value={lat}
+            onChange={(e) => setLat(e.target.value)}
+          />
         </div>
-        <div className="w-32">
-          <label className="block text-sm" htmlFor={`lng-${domicilio.id}`}>
-            <span className="mb-1.5 block font-semibold text-navy-800">Lng (opc.)</span>
-            <input
-              id={`lng-${domicilio.id}`}
-              className="min-h-12 w-full rounded-xl border-2 border-slate-200 px-3 py-3 text-base shadow-sm outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100"
-              value={lng}
-              onChange={(e) => setLng(e.target.value)}
-            />
-          </label>
+        <div className="w-28">
+          <input
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+            placeholder="Lng (opcional)"
+            value={lng}
+            onChange={(e) => setLng(e.target.value)}
+          />
         </div>
         <Button loading={enviando} onClick={actualizar}>
-          <RefreshCw className="h-5 w-5" aria-hidden="true" />
           Actualizar
         </Button>
       </div>
       {error && (
-        <div className="mt-4">
+        <div className="mt-3">
           <Alert variant="error">{error}</Alert>
         </div>
       )}
@@ -119,16 +106,16 @@ export default function RegenteDomiciliosPage() {
 
   return (
     <div>
-      <PageHeader icon={Truck} title="Domicilios activos" description="Pedidos sin entregar en tu IPS. Actualiza su estado logístico aquí." />
+      <PageHeader title="Domicilios activos" description="Pedidos sin entregar en tu IPS. Actualiza su estado logístico aquí." />
 
       {error && <Alert variant="error">{error}</Alert>}
 
       {cargando ? (
         <CenteredLoader label="Cargando domicilios activos…" />
       ) : domicilios.length === 0 ? (
-        <EmptyState icon={Truck} title="No hay domicilios activos" description="Todos los pedidos de tu IPS ya fueron entregados." />
+        <EmptyState title="No hay domicilios activos" description="Todos los pedidos de tu IPS ya fueron entregados." />
       ) : (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           {domicilios.map((domicilio) => (
             <FilaDomicilio
               key={domicilio.id}
