@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MediCerca</title>
+    <meta
+      name="description"
+      content="MediCerca: consulta medicamentos, gestiona órdenes médicas y pide domicilios a través de tu IPS."
+    />
+  </head>
+  <body class="bg-slate-50 text-slate-900">
+    <div id="root"></div>
+    <!-- Solo se usa si VITE_RECAPTCHA_SITE_KEY está configurada (ver
+         src/components/Captcha.jsx); si no, no hace nada. -->
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

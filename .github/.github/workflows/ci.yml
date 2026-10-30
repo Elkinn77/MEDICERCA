@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    name: Tests (pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements-dev.txt
+
+      # requirements-dev.txt esta fijado con pip-compile (ver requirements*.in):
+      # el mismo build que se prueba aqui es el que se despliega, no una
+      # resolucion distinta de rangos abiertos cada vez que corre CI.
+      - name: Instalar dependencias
+        run: pip install -r requirements-dev.txt
+
+      - name: Correr la suite de tests
+        run: pytest -q
+
+  seguridad:
+    name: Seguridad estatica (bandit + pip-audit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias y herramientas de escaneo
+        run: |
+          pip install -r requirements-dev.txt
+          pip install bandit pip-audit
+
+      - name: bandit (codigo propio de la app)
+        run: bandit -r app
+
+      # PYSEC-2026-1325 (ecdsa, timing attack tipo Minerva en firmas ECDSA):
+      # ecdsa entra transitivamente via python-jose, pero esta app firma JWT
+      # con HS256 (ver config.py: algorithm="HS256"), no con ningun algoritmo
+      # ECDSA — el codigo vulnerable de ecdsa nunca se ejecuta en este
+      # proyecto. El proyecto ecdsa marca los ataques de canal lateral como
+      # fuera de alcance y no planea corregirlo, asi que no hay version que
+      # instalar para "arreglarlo". Si aparece una vulnerabilidad NUEVA en
+      # cualquier otra dependencia, este paso sigue fallando el build.
+      - name: pip-audit (dependencias de produccion)
+        run: pip-audit -r requirements.txt --ignore-vuln PYSEC-2026-1325
+
+      - name: pip-audit (dependencias de desarrollo)
+        run: pip-audit -r requirements-dev.txt --ignore-vuln PYSEC-2026-1325
