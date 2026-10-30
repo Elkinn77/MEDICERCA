@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -83,7 +85,9 @@ def crear_domicilio(
         db.commit()
         db.refresh(domicilio)
         db.expunge(domicilio)
-        return domicilio
+    # Confirmación por correo (misma información que ve el paciente en pantalla).
+    _notificar_cambio_domicilio(db_central, usuario.cedula, domicilio)
+    return domicilio
 
 
 @router.get("/mias", response_model=list[DomicilioOut])
@@ -189,7 +193,8 @@ def cancelar(
         db.commit()
         db.refresh(domicilio)
         db.expunge(domicilio)
-        return domicilio
+    _notificar_cambio_domicilio(db_central, usuario.cedula, domicilio)
+    return domicilio
 
 
 @router.patch("/{ips_id}/{domicilio_id}/estado", response_model=DomicilioOut)
@@ -239,6 +244,8 @@ def _notificar_cambio_domicilio(db_central: Session, cedula_paciente: str, domic
     if not paciente:
         return
     etiquetas = {
+        EstadoDomicilio.CONFIRMADO: "fue confirmado",
+        EstadoDomicilio.CANCELADO: "fue cancelado",
         EstadoDomicilio.EN_ALISTAMIENTO: "está en alistamiento",
         EstadoDomicilio.EN_CAMINO: "ya está en camino",
         EstadoDomicilio.ENTREGADO: "fue entregado",
@@ -249,5 +256,6 @@ def _notificar_cambio_domicilio(db_central: Session, cedula_paciente: str, domic
     enviar_correo(
         paciente.correo,
         "Actualización de tu domicilio en MediCerca",
-        f"<p>Hola {paciente.nombre},</p><p>Tu domicilio #{domicilio.id} {descripcion}.</p>",
+        f"<p>Hola {paciente.nombre},</p><p>Tu domicilio #{domicilio.id} {descripcion}.</p>"
+        f"<p>Fecha y hora: {datetime.now(timezone.utc).strftime('%d/%m/%Y %H:%M')} UTC.</p>",
     )
